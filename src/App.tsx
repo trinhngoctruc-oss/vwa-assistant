@@ -180,18 +180,9 @@ export default function App() {
                 <div className="bg-white border-b border-blue-100 py-6 shadow-sm">
                   <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="bg-blue-50 text-blue-700 font-bold text-[10px] px-2.5 py-0.5 rounded-full uppercase border border-blue-100">Cổng Tuyển Sinh</span>
-                        <span className="text-[11px] text-slate-300">•</span>
-                        <span className="text-xs text-slate-500 font-semibold">Tự động hóa hỏi đáp qua cơ sở dữ liệu tri thức đáng tin cậy</span>
-                      </div>
                       <h2 className="font-display font-extrabold text-lg md:text-xl text-[#003366] mt-1.5">
-                        Trợ lý Tuyển sinh Thông minh Học viện Phụ nữ Việt Nam
+                        Trợ lý Tuyển sinh thông minh - Học viện Phụ nữ Việt Nam
                       </h2>
-                    </div>
-                    <div className="flex items-center space-x-3 text-xs bg-blue-50 py-2 px-3.5 rounded-2xl border border-blue-100 text-blue-800">
-                      <Shield className="h-4 w-4 text-blue-600 shrink-0" />
-                      <span className="font-semibold">Môi trường bảo mật & chính quy</span>
                     </div>
                   </div>
                 </div>
@@ -282,10 +273,10 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
             <p className="font-bold text-slate-800">HỌC VIỆN PHỤ NỮ VIỆT NAM (VIETNAM WOMEN'S ACADEMY)</p>
-            <p className="text-slate-400 mt-0.5 font-medium font-sans">Trụ sở chính: Số 68 Nguyễn Chí Thanh, Láng Thượng, Đống Đa, Hà Nội</p>
+            <p className="text-slate-400 mt-0.5 font-medium font-sans">Trụ sở chính: Số 68 Nguyễn Chí Thanh, Phường Láng, Hà Nội</p>
           </div>
           <p className="text-[11px] text-slate-400 font-medium">
-            AI-Engine powered by Gemini 3.5 Flash • © 2026 Toàn quyền Học viện Phụ nữ Việt Nam.
+            AI-Engine powered by Gemini 3.5 Flash • © 2026 Bản quyền thuộc về Học viện Phụ nữ Việt Nam.
           </p>
         </div>
       </footer>
