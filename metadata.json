@@ -1,0 +1,6 @@
+{
+  "name": "Hệ thống Chatbot AI tư vấn tuyển sinh Học viện Phụ nữ Việt Nam",
+  "description": "Hệ thống hỗ trợ thí sinh, phụ huynh và học viên hỏi đáp về công tác tuyển sinh đại học và sau đại học của Học viện Phụ nữ Việt Nam, tích hợp quản trị tài liệu RAG thông minh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

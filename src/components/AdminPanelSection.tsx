@@ -1,0 +1,1183 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useEffect } from 'react';
+import { 
+  FileText, Upload, Plus, Trash2, ToggleLeft, ToggleRight, CheckCircle2, 
+  HelpCircle, Eye, Edit, BarChart3, Clock, AlertTriangle, RefreshCw, 
+  Tag, Download, FileSpreadsheet, Check, X, BookmarkCheck, ThumbsUp, ThumbsDown,
+  Users, UserPlus, ShieldAlert, KeyRound
+} from 'lucide-react';
+import { RecruitmentDocument, FAQ, HistoryItem, RecruitmentStats } from '../types.ts';
+
+interface AdminPanelSectionProps {
+  documents: RecruitmentDocument[];
+  faqs: FAQ[];
+  history: HistoryItem[];
+  stats: RecruitmentStats | null;
+  onRefreshAll: () => void;
+  currentUser: { email: string; role: string; name: string } | null;
+}
+
+export default function AdminPanelSection({ 
+  documents, 
+  faqs, 
+  history, 
+  stats, 
+  onRefreshAll,
+  currentUser
+}: AdminPanelSectionProps) {
+  // Tabs: 'docs' | 'faqs' | 'history' | 'stats' | 'admins'
+  const [activeTab, setActiveTab] = useState<'docs' | 'faqs' | 'history' | 'stats' | 'admins'>('docs');
+  
+  // Document interaction states
+  const [selectedDoc, setSelectedDoc] = useState<RecruitmentDocument | null>(null);
+  const [editDocText, setEditDocText] = useState('');
+  const [isEditingDoc, setIsEditingDoc] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+
+  // Form states for adding FAQ
+  const [newFaqQuestion, setNewFaqQuestion] = useState('');
+  const [newFaqAnswer, setNewFaqAnswer] = useState('');
+  const [newFaqCategory, setNewFaqCategory] = useState<'ug' | 'pg' | 'general'>('ug');
+  const [newFaqTags, setNewFaqTags] = useState('');
+
+  // Admins management state
+  const [adminsList, setAdminsList] = useState<string[]>([]);
+  const [newAdminEmailInput, setNewAdminEmailInput] = useState('');
+  const [adminsLoading, setAdminsLoading] = useState(false);
+  const [adminsError, setAdminsError] = useState('');
+  const [adminsSuccess, setAdminsSuccess] = useState('');
+
+  // Fetch approved admin accounts
+  const fetchAdmins = async () => {
+    if (!currentUser) return;
+    setAdminsLoading(true);
+    setAdminsError('');
+    try {
+      const res = await fetch('/api/admins', {
+        headers: { 'x-user-email': currentUser.email }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setAdminsList(data.admins);
+      } else {
+        setAdminsError(data.message || 'Lỗi khi lấy danh sách cán bộ.');
+      }
+    } catch (err: any) {
+      setAdminsError('Lỗi kết nối: ' + err.message);
+    } finally {
+      setAdminsLoading(false);
+    }
+  };
+
+  // Add a new approved admin
+  const handleAddAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser || !newAdminEmailInput.trim()) return;
+
+    setAdminsLoading(true);
+    setAdminsError('');
+    setAdminsSuccess('');
+
+    try {
+      const res = await fetch('/api/admins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          creatorEmail: currentUser.email,
+          newAdminEmail: newAdminEmailInput.trim()
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setNewAdminEmailInput('');
+        setAdminsSuccess(data.message || 'Cấp quyền cán bộ thành công!');
+        setAdminsList(data.admins);
+      } else {
+        setAdminsError(data.message || 'Không thể cấp quyền cán bộ.');
+      }
+    } catch (err: any) {
+      setAdminsError('Lỗi kết nối: ' + err.message);
+    } finally {
+      setAdminsLoading(false);
+    }
+  };
+
+  // Remove an approved admin
+  const handleRemoveAdmin = async (emailToRemove: string) => {
+    if (!currentUser) return;
+    if (!window.confirm(`Bạn có chắc chắn muốn thu hồi quyền cán bộ quản trị của ${emailToRemove}?`)) return;
+
+    setAdminsLoading(true);
+    setAdminsError('');
+    setAdminsSuccess('');
+
+    try {
+      const res = await fetch(`/api/admins/${encodeURIComponent(emailToRemove)}`, {
+        method: 'DELETE',
+        headers: { 'x-user-email': currentUser.email }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setAdminsSuccess(data.message || 'Đã thu hồi quyền cán bộ.');
+        setAdminsList(data.admins);
+      } else {
+        setAdminsError(data.message || 'Không thể thu hồi quyền.');
+      }
+    } catch (err: any) {
+      setAdminsError('Lỗi kết nối: ' + err.message);
+    } finally {
+      setAdminsLoading(false);
+    }
+  };
+
+  // Fetch admins list when tab is activated
+  useEffect(() => {
+    if (activeTab === 'admins') {
+      fetchAdmins();
+    }
+  }, [activeTab, currentUser]);
+
+  // Form upload fields
+  const [newDocTitle, setNewDocTitle] = useState('');
+  const [newDocCategory, setNewDocCategory] = useState<'ug' | 'pg' | 'general'>('ug');
+  const [newDocVersion, setNewDocVersion] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  // Auto trigger stats fetch
+  useEffect(() => {
+    onRefreshAll();
+  }, []);
+
+  // Set selected document's text edit field
+  useEffect(() => {
+    if (selectedDoc) {
+      setEditDocText(selectedDoc.content);
+    }
+  }, [selectedDoc]);
+
+  // File selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      // Auto-populate file name into title if empty
+      if (!newDocTitle) {
+        setNewDocTitle(file.name.substring(0, file.name.lastIndexOf('.')) || file.name);
+      }
+    }
+  };
+
+  // Upload Document
+  const handleUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFile) {
+      setUploadError('Vui lòng chọn một tập tin .docx, .pdf, .txt hoặc .xlsx');
+      return;
+    }
+
+    setUploadProgress(true);
+    setUploadError('');
+    setUploadSuccess(false);
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('title', newDocTitle);
+    formData.append('category', newDocCategory);
+    formData.append('version', newDocVersion || '2025.1');
+
+    try {
+      const res = await fetch('/api/documents/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUploadSuccess(true);
+        setSelectedFile(null);
+        setNewDocTitle('');
+        setNewDocVersion('');
+        onRefreshAll();
+      } else {
+        setUploadError(data.message || 'Lỗi xử lý file tải lên.');
+      }
+    } catch (err: any) {
+      setUploadError('Lỗi kết nối khi nộp tài liệu: ' + err.message);
+    } finally {
+      setUploadProgress(false);
+    }
+  };
+
+  // Delete document
+  const handleDeleteDoc = async (id: string) => {
+    if (!window.confirm('Cán bộ có chắc chắn muốn xóa tài liệu này khỏi Hệ thống hỏi đáp thông minh?')) return;
+    try {
+      const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        if (selectedDoc?.id === id) setSelectedDoc(null);
+        onRefreshAll();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Toggle boolean properties
+  const handleToggleProp = async (id: string, prop: 'isActive' | 'isLatest') => {
+    try {
+      const res = await fetch(`/api/documents/${id}/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prop })
+      });
+      if (res.ok) {
+        onRefreshAll();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Update document parsed text content
+  const handleSaveDocEdit = async () => {
+    if (!selectedDoc) return;
+    try {
+      const res = await fetch(`/api/documents/${selectedDoc.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: selectedDoc.title,
+          content: editDocText,
+          version: selectedDoc.version,
+          category: selectedDoc.category,
+        })
+      });
+      if (res.ok) {
+        setIsEditingDoc(false);
+        const data = await res.json();
+        setSelectedDoc(data.document);
+        onRefreshAll();
+        alert('Cập nhật tài liệu tuyển sinh thành công!');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Submit FAQ
+  const handleFaqSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFaqQuestion.trim() || !newFaqAnswer.trim()) return;
+
+    try {
+      const tagsArray = newFaqTags.split(',').map(t => t.trim()).filter(Boolean);
+      const res = await fetch('/api/faqs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: newFaqQuestion,
+          answer: newFaqAnswer,
+          category: newFaqCategory,
+          tags: tagsArray,
+        })
+      });
+      if (res.ok) {
+        setNewFaqQuestion('');
+        setNewFaqAnswer('');
+        setNewFaqTags('');
+        onRefreshAll();
+        alert('Đã bổ sung câu hỏi thường gặp vào Tri thức!');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Prepopulate FAQ from User Query history item
+  const handlePrepopulateFAQ = (historyItem: HistoryItem) => {
+    setNewFaqQuestion(historyItem.question);
+    setNewFaqAnswer(historyItem.answer);
+    setNewFaqCategory(historyItem.categoryMatched === 'unknown' ? 'ug' : (historyItem.categoryMatched as any));
+    setNewFaqTags(historyItem.tags.join(', '));
+    setActiveTab('faqs');
+    // Scroll FAQ form to view
+    window.scrollTo({ top: 300, behavior: 'smooth' });
+  };
+
+  // Delete FAQ
+  const handleDeleteFaq = async (id: string) => {
+    if (!window.confirm('Cán bộ có muốn xóa câu hỏi FAQ này không?')) return;
+    try {
+      const res = await fetch(`/api/faqs/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        onRefreshAll();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      
+      {/* Intro Admin Banner - White/Blue styled gradient */}
+      <div className="bg-gradient-to-r from-[#003366] via-blue-800 to-indigo-950 text-white p-6 rounded-3xl border border-blue-900/50 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
+        <div>
+          <div className="flex items-center space-x-2">
+            <BookmarkCheck className="h-5 w-5 text-sky-400" />
+            <h1 className="font-display font-bold text-xl uppercase tracking-wide">Hệ thống Quản lý Dữ liệu Tuyển sinh Học viên</h1>
+          </div>
+          <p className="text-xs text-blue-200 mt-1 font-medium">
+            Dành cho Cán bộ phòng tuyển sinh và phòng đào tạo Học viện Phụ nữ Việt Nam quản lý tài liệu, FAQ, lịch sử và RAG.
+          </p>
+        </div>
+        <button 
+          onClick={onRefreshAll}
+          className="flex items-center space-x-1.5 border border-white/20 bg-white/10 py-2 px-3.5 rounded-xl text-xs hover:bg-white/20 font-semibold text-white transition-all cursor-pointer shadow-sm"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          <span>Đồng bộ Cơ sở dữ liệu</span>
+        </button>
+      </div>
+
+      {/* Admin Tabs */}
+      <div className="flex border-b border-blue-100 mb-6 font-sans overflow-x-auto whitespace-nowrap">
+        {( () => {
+          const tabItems = [
+            { id: 'docs', label: 'Tài liệu & Đề án tuyển sinh', count: documents.length },
+            { id: 'faqs', label: 'Ngân hàng FAQ tuyển sinh', count: faqs.length },
+            { id: 'history', label: 'Lịch sử hỏi đáp thí sinh', count: history.length },
+            { id: 'stats', label: 'Phân tích & Thống kê hỏi nóng', count: null }
+          ];
+          if (currentUser) {
+            tabItems.push({ id: 'admins', label: 'Cấp quyền & Quản lý Cán bộ', count: null });
+          }
+          return tabItems;
+        })().map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`py-3.5 px-4 text-xs font-bold select-none flex items-center space-x-2 border-b-2 transition-all cursor-pointer ${
+              activeTab === tab.id 
+                ? 'border-blue-600 text-blue-700' 
+                : 'border-transparent text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <span>{tab.label}</span>
+            {tab.count !== null && (
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                activeTab === tab.id
+                  ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                  : 'bg-slate-100 text-slate-500 border border-slate-200'
+              }`}>
+                {tab.count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* TAB 1: DOCUMENTS MANAGEMENT & PARSING */}
+      {activeTab === 'docs' && (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+          
+          {/* Docs list and management (Span 2) */}
+          <div className="xl:col-span-2 space-y-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+              <h2 className="text-sm font-bold text-brand-blue-dark uppercase tracking-wide mb-4 flex items-center space-x-2">
+                <FileText className="h-4 w-4" />
+                <span>Danh sách tài liệu tri thức đang khả dụng</span>
+              </h2>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold">
+                      <th className="p-3">Tên tài liệu văn bản / Đề án</th>
+                      <th className="p-3">Hệ Đào Tạo</th>
+                      <th className="p-3">Phiên bản</th>
+                      <th className="p-3">Trạng thái</th>
+                      <th className="p-3 text-right">Khác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {documents.map((doc) => (
+                      <tr 
+                        key={doc.id}
+                        className={`hover:bg-slate-50/70 transition-colors ${selectedDoc?.id === doc.id ? 'bg-blue-50/40 font-semibold' : ''}`}
+                      >
+                        <td className="p-3 max-w-[280px]">
+                          <div className="font-bold text-slate-800 line-clamp-1">{doc.title}</div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 flex items-center space-x-2">
+                            <span className="font-semibold uppercase text-brand-blue-light">{doc.fileType}</span>
+                            <span>•</span>
+                            <span>Tông số đoạn: {doc.chunksCount}</span>
+                            <span>•</span>
+                            <span>Nộp: {doc.uploadDate}</span>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                            doc.category === 'ug' 
+                              ? 'bg-amber-100 text-amber-800' 
+                              : doc.category === 'pg' 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-slate-100 text-slate-800'
+                          }`}>
+                            {doc.category === 'ug' ? 'Đại học' : doc.category === 'pg' ? 'Sau đại học' : 'Chung'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-600 font-mono">
+                          v{doc.version}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex flex-col space-y-1.5">
+                            <button
+                              onClick={() => handleToggleProp(doc.id, 'isActive')}
+                              className="flex items-center space-x-1 text-left cursor-pointer text-slate-600 hover:text-slate-950 font-medium"
+                            >
+                              {doc.isActive ? (
+                                <span className="flex items-center space-x-1">
+                                  <ToggleRight className="h-4.5 w-4.5 text-green-500" />
+                                  <span className="text-[10px] text-green-700">Hoạt động</span>
+                                </span>
+                              ) : (
+                                <span className="flex items-center space-x-1">
+                                  <ToggleLeft className="h-4.5 w-4.5 text-slate-350" />
+                                  <span className="text-[10px] text-slate-400">Tạm tắt</span>
+                                </span>
+                              )}
+                            </button>
+                            
+                            <button
+                              onClick={() => handleToggleProp(doc.id, 'isLatest')}
+                              className="text-left font-semibold text-[10px] cursor-pointer"
+                            >
+                              {doc.isLatest ? (
+                                <span className="text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">Mới Nhất</span>
+                              ) : (
+                                <span className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 px-1.5 py-0.5 rounded">Bản cũ</span>
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end space-x-2">
+                            <button
+                              onClick={() => setSelectedDoc(doc)}
+                              className="p-1 text-sky-600 hover:text-sky-900 hover:bg-sky-50 rounded cursor-pointer"
+                              title="Xem chi tiết và chỉnh sửa trích xuất"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteDoc(doc.id)}
+                              className="p-1 text-red-650 hover:text-red-900 hover:bg-red-50 rounded cursor-pointer"
+                              title="Xóa tài liệu khỏi hệ thống"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Editing Parsed Text of selected doc */}
+            {selectedDoc && (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                  <div>
+                    <h3 className="font-display font-bold text-sm text-brand-blue-dark">
+                      Kiểm duyệt & Chỉnh sửa Văn bản Trích xuất tự động bằng AI
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Cập nhật thủ công nội dung RAG cho tài liệu: <span className="font-bold text-slate-600">{selectedDoc.title}</span>
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedDoc(null)}
+                    className="text-slate-400 hover:text-slate-600 text-xs font-bold"
+                  >
+                    Đóng biên tập
+                  </button>
+                </div>
+
+                {isEditingDoc ? (
+                  <div className="space-y-4">
+                    <textarea
+                      value={editDocText}
+                      onChange={(e) => setEditDocText(e.target.value)}
+                      rows={12}
+                      className="w-full text-xs font-mono text-slate-700 bg-slate-50 p-4 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue-light"
+                    ></textarea>
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        onClick={() => {
+                          setIsEditingDoc(false);
+                          setEditDocText(selectedDoc.content);
+                        }}
+                        className="px-4 py-2 border border-slate-200 rounded-lg text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+                      >
+                        Hủy bỏ
+                      </button>
+                      <button
+                        onClick={handleSaveDocEdit}
+                        className="px-5 py-2 bg-brand-blue-dark hover:bg-blue-950 text-white rounded-lg text-xs font-bold shadow-sm cursor-pointer"
+                      >
+                        Lưu Thay đổi
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4 bg-slate-50/50 p-4 rounded-xl border border-dashed border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500 uppercase">Xem trước văn bản thô RAG</span>
+                      <button
+                        onClick={() => setIsEditingDoc(true)}
+                        className="flex items-center space-x-1.5 text-xs text-brand-blue-dark hover:text-blue-950 hover:underline font-bold"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                        <span>Bấm vào để bắt đầu Sửa đổi</span>
+                      </button>
+                    </div>
+                    <div className="bg-white p-4 rounded-lg text-xs font-sans text-slate-600 max-h-[300px] overflow-y-auto whitespace-pre-line border border-slate-200 custom-scrollbar">
+                      {selectedDoc.content}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Upload new doc form (Span 1) */}
+          <div className="xl:col-span-1 space-y-6">
+            <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 sticky top-24 shadow-2xl text-slate-100">
+              <h2 className="text-xs font-bold text-teal-400 uppercase tracking-widest mb-4 flex items-center space-x-2">
+                <Upload className="h-4 w-4 animate-bounce" />
+                <span>Tải tài liệu tuyển sinh mới</span>
+              </h2>
+
+              <form onSubmit={handleUploadSubmit} className="space-y-4">
+                
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-1.5">
+                    Hệ đào tạo tuyển sinh *
+                  </label>
+                  <select
+                    value={newDocCategory}
+                    onChange={(e) => setNewDocCategory(e.target.value as any)}
+                    className="w-full text-slate-100 bg-slate-950 text-xs border border-white/10 rounded-xl p-2.5 outline-none focus:ring-1 focus:ring-teal-500 transition-all font-medium"
+                  >
+                    <option value="ug" className="bg-slate-900">Đại Học Chính Quy (Undergraduate)</option>
+                    <option value="pg" className="bg-slate-900">Thạc Sĩ / Sau Đại Học (Postgraduate)</option>
+                    <option value="general" className="bg-slate-900">Khác / Tổng Quan Chung</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-1.5">
+                    Tên đặt tiêu đề tài liệu *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newDocTitle}
+                    onChange={(e) => setNewDocTitle(e.target.value)}
+                    placeholder="Ví dụ: Đề án Tuyển sinh Đại học 2025"
+                    className="w-full text-slate-100 bg-slate-950 text-xs border border-white/10 rounded-xl p-2.5 placeholder:text-slate-650 outline-none focus:ring-1 focus:ring-teal-500 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-1.5">
+                    Số phiên bản nộp tài liệu
+                  </label>
+                  <input
+                    type="text"
+                    value={newDocVersion}
+                    onChange={(e) => setNewDocVersion(e.target.value)}
+                    placeholder="Mặc định: 1.0"
+                    className="w-full text-slate-100 bg-slate-950 text-xs border border-white/10 rounded-xl p-2.5 placeholder:text-slate-650 outline-none focus:ring-1 focus:ring-teal-500 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-1.5">
+                    Chọn tệp tuyển sinh (.docx, .pdf, .xlsx, .txt) *
+                  </label>
+                  <div className="border-2 border-dashed border-white/10 hover:border-teal-500 rounded-2xl p-5 text-center cursor-pointer hover:bg-white/5 transition-all relative">
+                    <input
+                      type="file"
+                      required
+                      accept=".docx,.pdf,.xlsx,.csv,.txt"
+                      onChange={handleFileChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <FileSpreadsheet className="mx-auto h-8 w-8 text-teal-500/85 mb-2" />
+                    <p className="text-xs font-semibold text-slate-200">
+                      {selectedFile ? selectedFile.name : 'Kéo thả hoặc Click chọn file'}
+                    </p>
+                    <p className="text-[9px] text-teal-400 font-semibold mt-2.5 leading-relaxed bg-teal-500/10 border border-teal-500/20 p-2 rounded-lg">
+                      ⚡ Đã nâng cấp RAG: Tự động nhân bản các ô gộp (colspan/rowspan) phức tạp và phân rã hàng thành văn xuôi chuẩn xác.
+                    </p>
+                  </div>
+                </div>
+
+                {uploadError && (
+                  <div className="bg-red-950/40 p-3 rounded-xl border border-red-500/20 text-[11px] text-red-400 leading-normal flex items-start space-x-1.5">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-red-500" />
+                    <span>{uploadError}</span>
+                  </div>
+                )}
+
+                {uploadSuccess && (
+                  <div className="bg-teal-950/40 p-3 rounded-xl border border-teal-500/20 text-[11px] text-teal-400 leading-normal flex items-start space-x-1.5 animate-pulse">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-teal-500" />
+                    <span>Nộp tài liệu thành công! Robot RAG đã phân đoạn trích xuất dữ liệu tự động.</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={uploadProgress || !selectedFile}
+                  className="w-full bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold py-3 px-4 rounded-xl text-xs shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {uploadProgress ? (
+                    <>
+                      <LoaderIcon className="animate-spin text-slate-950" />
+                      <span>Đang trích xuất xử lý AI RAG ...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4" />
+                      <span>Xử lý & Khai thác Tri thức</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* TAB 2: BAN NGÂN HÀNG FAQ */}
+      {activeTab === 'faqs' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* List existing FAQs */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+              <h2 className="text-sm font-bold text-brand-blue-dark uppercase tracking-wide mb-4 flex items-center space-x-2">
+                <HelpCircle className="h-4 w-4" />
+                <span>Danh sách câu hỏi thường gặp đã xuất bản</span>
+              </h2>
+
+              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                {faqs.map((faq) => (
+                  <div 
+                    key={faq.id}
+                    className="p-4 bg-slate-50/50 rounded-xl border border-slate-150 hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="flex items-center space-x-2.5 flex-wrap gap-1.5">
+                          <span className={`px-2 py-0.5 rounded font-bold text-[9px] uppercase ${
+                            faq.category === 'ug' 
+                              ? 'bg-amber-100 text-amber-800' 
+                              : faq.category === 'pg' 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-slate-100 text-slate-800'
+                          }`}>
+                            {faq.category === 'ug' ? 'Đại học' : faq.category === 'pg' ? 'Sau ĐH' : 'Chung'}
+                          </span>
+                          
+                          {faq.tags.map((tag, i) => (
+                            <span key={i} className="text-[10px] bg-slate-200/60 text-slate-600 px-1.5 py-0.5 rounded flex items-center space-x-1 font-sans">
+                              <Tag className="h-2.5 w-2.5 text-slate-400" />
+                              <span>{tag}</span>
+                            </span>
+                          ))}
+                        </div>
+                        <h4 className="font-bold text-slate-800 text-xs mt-2.5">
+                          Hỏi: {faq.question}
+                        </h4>
+                        <p className="text-xs text-slate-600 mt-2.5 whitespace-pre-line leading-relaxed pl-3 border-l-2 border-brand-orange">
+                          {faq.answer}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteFaq(faq.id)}
+                        className="p-1.5 text-slate-400 hover:text-red-550 hover:bg-red-50 rounded"
+                        title="Xóa FAQ khỏi danh sách"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Form to add FAQ */}
+          <div className="lg:col-span-1 space-y-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sticky top-24">
+              <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-4 flex items-center space-x-1.5">
+                <Plus className="h-4.5 w-4.5 text-brand-orange animate-pulse" />
+                <span>Thêm câu hỏi FAQ mẫu mới</span>
+              </h2>
+
+              <form onSubmit={handleFaqSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                    Hệ đào tạo tuyển sinh *
+                  </label>
+                  <select
+                    value={newFaqCategory}
+                    onChange={(e) => setNewFaqCategory(e.target.value as any)}
+                    className="w-full text-slate-800 text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-brand-blue-light"
+                  >
+                    <option value="ug">Đại Học Chính Quy</option>
+                    <option value="pg">Thạc Sĩ / Tiến Sĩ</option>
+                    <option value="general">Phân hệ Tổng Quan Chung</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                    Nhập câu hỏi mẫu *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newFaqQuestion}
+                    onChange={(e) => setNewFaqQuestion(e.target.value)}
+                    placeholder="Ví dụ: Cách thức đăng ký xét tuyển học bạ bằng Zalo?"
+                    className="w-full text-slate-800 text-xs border border-slate-200 rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-blue-light font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                    Nhập câu trả lời chi tiết *
+                  </label>
+                  <textarea
+                    required
+                    value={newFaqAnswer}
+                    onChange={(e) => setNewFaqAnswer(e.target.value)}
+                    placeholder="Nhập nội dung thông tin trả lời..."
+                    rows={4}
+                    className="w-full text-slate-800 text-xs border border-slate-200 rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-blue-light"
+                  ></textarea>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                    Gắn từ khóa tìm kiếm (Gần nhau ngăn cách bằng dấu phẩy)
+                  </label>
+                  <input
+                    type="text"
+                    value={newFaqTags}
+                    onChange={(e) => setNewFaqTags(e.target.value)}
+                    placeholder="Ví dụ: đăng ký, học bạ, điện thoại"
+                    className="w-full text-slate-805 text-xs border border-slate-200 rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-blue-light"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Sẽ giúp chatbot liên kết tìm kiếm ngữ nghĩa nhanh hơn đợt tới.
+                  </span>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-brand-blue-dark hover:bg-blue-950 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-sm transition-all cursor-pointer flex items-center justify-center space-x-1.5"
+                >
+                  <Plus className="h-4.5 w-4.5" />
+                  <span>Lưu vào FAQ chung</span>
+                </button>
+              </form>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* TAB 3: USER INQUIRIES HISTORY */}
+      {activeTab === 'history' && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-3 mb-4 gap-2">
+            <div>
+              <h2 className="text-sm font-bold text-brand-blue-dark uppercase tracking-wide flex items-center space-x-2">
+                <Clock className="h-4 w-4" />
+                <span>Nhật ký & Lịch sử người dùng đặt câu hỏi thực tế</span>
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Theo dõi sát nhu cầu học sinh/học viên tìm hiểu, giúp cán bộ bổ sung câu trả lời mẫu nhanh chóng.
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold">
+                  <th className="p-3">Thời gian</th>
+                  <th className="p-3">Phân hệ</th>
+                  <th className="p-3">Câu hỏi đặt ra</th>
+                  <th className="p-3">Gắn nhãn tuyển sinh</th>
+                  <th className="p-3">Đánh giá</th>
+                  <th className="p-3 text-right">Khác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {history.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="p-3 text-slate-500 whitespace-nowrap">
+                      {new Date(item.timestamp).toLocaleString('vi-VN', { 
+                        month: '2-digit', 
+                        day: '2-digit', 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </td>
+                    <td className="p-3">
+                      <span className={`px-2 py-0.5 rounded font-bold text-[9px] uppercase ${
+                        item.categoryMatched === 'ug' 
+                          ? 'bg-amber-100 text-amber-800' 
+                          : item.categoryMatched === 'pg' 
+                          ? 'bg-blue-100 text-blue-800' 
+                          : 'bg-slate-100 text-slate-800'
+                      }`}>
+                        {item.categoryMatched === 'ug' ? 'Đại học' : item.categoryMatched === 'pg' ? 'Sau ĐH' : 'Chung'}
+                      </span>
+                    </td>
+                    <td className="p-3 max-w-[320px]">
+                      <div className="font-bold text-slate-800" title={item.question}>{item.question}</div>
+                      <div className="text-[11px] text-slate-500 line-clamp-1 mt-1 font-sans font-medium whitespace-pre-wrap">{item.answer.substring(0, 150)}...</div>
+                    </td>
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-1 max-w-[200px]">
+                        {item.tags.map((tag, i) => (
+                          <span key={i} className="text-[9px] bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded font-medium border border-sky-100">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="p-3 whitespace-nowrap">
+                      {item.feedback === 'up' && (
+                        <span className="text-green-600 bg-green-50 px-2 py-0.5 rounded-full font-bold flex items-center space-x-1 w-max">
+                          <ThumbsUp className="h-3 w-3" />
+                          <span className="text-[10px]">Cực hữu ích</span>
+                        </span>
+                      )}
+                      {item.feedback === 'down' && (
+                        <span className="text-red-600 bg-red-50 px-2 py-0.5 rounded-full font-bold flex items-center space-x-1 w-max">
+                          <ThumbsDown className="h-3 w-3" />
+                          <span className="text-[10px]">Cần tối ưu</span>
+                        </span>
+                      )}
+                      {item.feedback === null && (
+                        <span className="text-slate-400 text-[10px]">-</span>
+                      )}
+                    </td>
+                    <td className="p-3 text-right">
+                      <button
+                        onClick={() => handlePrepopulateFAQ(item)}
+                        className="py-1 px-2.5 bg-brand-orange text-brand-blue-dark text-[10px] font-bold rounded-lg hover:shadow cursor-pointer transition-all"
+                        title="Sao chép nội dung này thành FAQ mẫu mới của trường"
+                      >
+                        Bổ sung làm mẫu
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: REAL-TIME ANALYTICS STATS */}
+      {activeTab === 'stats' && stats && (
+        <div className="space-y-8 animate-fade-in">
+          
+          {/* Top Numeric KPI cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 flex items-center space-x-4 shadow-sm">
+              <div className="bg-blue-50 text-brand-blue-dark p-3 rounded-2xl">
+                <BarChart3 className="h-6 w-6" />
+              </div>
+              <div>
+                <span className="block text-slate-400 font-bold uppercase text-[9px] tracking-wider">Tổng câu hỏi nhận được</span>
+                <span className="text-2xl font-bold font-display text-slate-800">{stats.totalQuestions}</span>
+              </div>
+            </div>
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 flex items-center space-x-4 shadow-sm">
+              <div className="bg-emerald-50 text-emerald-700 p-3 rounded-2xl">
+                <FileText className="h-6 w-6" />
+              </div>
+              <div>
+                <span className="block text-slate-400 font-bold uppercase text-[9px] tracking-wider">Tài liệu RAG văn bản cập nhật</span>
+                <span className="text-2xl font-bold font-display text-slate-800">{stats.totalDocs}</span>
+              </div>
+            </div>
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 flex items-center space-x-4 shadow-sm">
+              <div className="bg-amber-50 text-amber-700 p-3 rounded-2xl">
+                <HelpCircle className="h-6 w-6" />
+              </div>
+              <div>
+                <span className="block text-slate-400 font-bold uppercase text-[9px] tracking-wider">Tổng FAQ mẫu khả dụng</span>
+                <span className="text-2xl font-bold font-display text-slate-800">{stats.totalFaqs}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            {/* Tag / Topic counts */}
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+              <h3 className="font-display font-semibold text-sm text-slate-800 mb-4 flex items-center space-x-2">
+                <Tag className="h-4.5 w-4.5 text-brand-orange" />
+                <span>Xếp hạng Chủ Đề được Thí sinh Hỏi nhiều Nhất đợt này</span>
+              </h3>
+              
+              <div className="space-y-3.5">
+                {stats.tagStats.length > 0 ? (
+                  stats.tagStats.map((tagObj, idx) => {
+                    const maxVal = Math.max(...stats.tagStats.map(t => t.count)) || 1;
+                    const percent = Math.round((tagObj.count / maxVal) * 100);
+                    return (
+                      <div key={idx} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-slate-700 uppercase tracking-tight">#{idx + 1} {tagObj.tag}</span>
+                          <span className="font-bold text-slate-500">{tagObj.count} lượt</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <div 
+                            className="bg-brand-blue-light h-full rounded-full transition-all"
+                            style={{ width: `${percent}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-xs text-slate-400 italic">Chưa phát tích đủ lượt hỏi đáp.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Category split */}
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+              <h3 className="font-display font-semibold text-sm text-slate-800 mb-4 flex items-center space-x-2">
+                <FileText className="h-4.5 w-4.5 text-sky-600" />
+                <span>Cơ cấu mối quan tâm Hệ Đào Tạo</span>
+              </h3>
+
+              <div className="space-y-5">
+                {stats.categoryStats.map((catObj, idx) => {
+                  const sumVal = stats.categoryStats.reduce((acc, curr) => acc + curr.count, 0) || 1;
+                  const ratio = Math.round((catObj.count / sumVal) * 100);
+                  return (
+                    <div key={idx} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2.5">
+                        <span className="h-3 w-3 rounded-full bg-slate-200 border border-slate-350" style={{
+                          backgroundColor: idx === 0 ? '#4a90e2' : idx === 1 ? '#003366' : idx === 2 ? '#f5a623' : '#94a3b8'
+                        }}></span>
+                        <span className="text-xs font-semibold text-slate-700">{catObj.category}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs font-bold text-slate-800 block">{catObj.count} câu hỏi</span>
+                        <span className="text-[10px] text-slate-400 block font-bold">{ratio}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Advice box for managers */}
+              <div className="mt-8 bg-blue-50/75 p-3.5 rounded-xl border border-blue-100 text-[11px] text-blue-800 leading-normal flex items-start space-x-2">
+                <HelpCircle className="h-4 w-4 shrink-0 text-brand-blue-light mt-0.5" />
+                <div>
+                  <strong>💡 Gợi ý tổ chức chiến dịch:</strong> Dựa trên dữ liệu hỏi nóng, chủ đề <strong>học phí</strong> và <strong>ngành ứng tuyển</strong> đang chiếm tỉ trọng cao nhất. Học viện nên tập trung xây dựng các video ngắn giới thiệu sâu về chương trình và học bổng đợt tới.
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: STAFF PERMISSIONS MANAGEMENT */}
+      {activeTab === 'admins' && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-slate-100 pb-4 mb-6">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 bg-blue-50 text-blue-700 rounded-xl">
+                  <Users className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900 uppercase">Danh sách cán bộ được phân quyền quản trị</h2>
+                  <p className="text-xs text-slate-400 font-medium">Danh mục các tài khoản có thẩm quyền quản trị hệ thống tri thức tuyển sinh</p>
+                </div>
+              </div>
+              <button 
+                onClick={fetchAdmins}
+                className="mt-3 md:mt-0 flex items-center space-x-1 border border-slate-200 hover:bg-slate-50 py-1.5 px-3 rounded-xl text-xs font-semibold text-slate-600 transition-colors cursor-pointer"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span>Nạp lại dữ liệu</span>
+              </button>
+            </div>
+
+            {adminsError && (
+              <div className="p-4 bg-red-50 text-red-700 rounded-xl border border-red-200 text-xs font-medium mb-5">
+                {adminsError}
+              </div>
+            )}
+            {adminsSuccess && (
+              <div className="p-4 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200 text-xs font-medium mb-5">
+                {adminsSuccess}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Add New Admin Section (Span 1) */}
+              <div className="lg:col-span-1 bg-slate-50/75 p-5 rounded-2xl border border-slate-150">
+                <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center space-x-1.5">
+                  <UserPlus className="h-4 w-4 text-blue-600" />
+                  <span>Cấp quyền Cán bộ Mới</span>
+                </h3>
+                
+                {currentUser?.email === 'tructn@vwa.edu.vn' ? (
+                  <form onSubmit={handleAddAdmin} className="space-y-4">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1.5">Địa chỉ email học viện</label>
+                      <input 
+                        type="email"
+                        placeholder="vi-du: cán-bo-abc@vwa.edu.vn"
+                        required
+                        value={newAdminEmailInput}
+                        onChange={(e) => setNewAdminEmailInput(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-xl py-2 px-3 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-mono"
+                      />
+                    </div>
+                    
+                    <div className="p-3 bg-blue-50/50 text-blue-800 text-[11px] rounded-lg border border-blue-100 flex items-start space-x-1.5">
+                      <ShieldAlert className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span>Cán bộ mới bắt buộc nhập đúng địa chỉ email có đuôi <strong>@vwa.edu.vn</strong> để có thể đăng nhập khớp tên miền.</span>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={adminsLoading}
+                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold py-2 px-4 rounded-xl text-xs shadow-sm transition-colors cursor-pointer flex items-center justify-center space-x-1"
+                    >
+                      <span>Cấp quyền Truy cập</span>
+                    </button>
+                  </form>
+                ) : (
+                  <div className="p-4 bg-orange-50 text-orange-850 text-xs rounded-xl border border-orange-100 flex items-start space-x-2">
+                    <ShieldAlert className="h-4.5 w-4.5 text-orange-500 shrink-0 mt-0.5" />
+                    <div>
+                      <strong>Quyền hạn hạn chế:</strong> Chỉ có Quản trị tối cao <strong>tructn@vwa.edu.vn</strong> mới có quyền cấp phép hoặc bãi miễn tài khoản quản trị khác.
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Admins List Table (Span 2) */}
+              <div className="lg:col-span-2">
+                <div className="overflow-x-auto border border-slate-150 rounded-2xl">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-150 text-slate-500 uppercase tracking-wider font-semibold">
+                        <th className="p-3">Tài khoản Email</th>
+                        <th className="p-3">Quyền hạn hạn mục</th>
+                        <th className="p-3">Trạng thái duyệt</th>
+                        <th className="p-3 text-right">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {/* Superadmin always on top */}
+                      <tr className="bg-blue-50/15">
+                        <td className="p-3 font-mono font-bold text-slate-900">tructn@vwa.edu.vn</td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#003366] text-white">Quản trị Tối cao</span>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center space-x-1.5 text-emerald-600 font-bold">
+                            <Check className="h-3.5 w-3.5" />
+                            <span>Mặc định</span>
+                          </div>
+                        </td>
+                        <td className="p-3 text-right text-slate-400 italic text-[11px]">Không thể thu hồi</td>
+                      </tr>
+
+                      {/* Other Admins */}
+                      {adminsList.filter(email => email.toLowerCase() !== 'tructn@vwa.edu.vn').map((email) => (
+                        <tr key={email} className="hover:bg-slate-50">
+                          <td className="p-3 font-mono text-slate-700">{email}</td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">Cán bộ Tuyển sinh</span>
+                          </td>
+                          <td className="p-3">
+                            <div className="flex items-center space-x-1.5 text-emerald-500 font-bold">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              <span>Được cấp phép</span>
+                            </div>
+                          </td>
+                          <td className="p-3 text-right">
+                            {currentUser?.email === 'tructn@vwa.edu.vn' ? (
+                              <button
+                                onClick={() => handleRemoveAdmin(email)}
+                                title="Thu hồi quyền quản trị"
+                                className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            ) : (
+                              <span className="text-slate-300">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+
+                      {adminsList.filter(email => email.toLowerCase() !== 'tructn@vwa.edu.vn').length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="p-6 text-center text-slate-400 italic">Chưa có tài khoản cán bộ bổ sung nào được cấp quyền quản trị.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+function LoaderIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" {...props}>
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+  );
+}
