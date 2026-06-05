@@ -30,6 +30,20 @@
   "faqs": [],
   "history": [
     {
+      "id": "hist_cache_1780591426144",
+      "timestamp": "2026-06-04T16:43:46.144Z",
+      "question": "Các ngành tuyển sinh Đại học chính quy năm nay? (Hãy trả lời chi tiết, trình bày khoa học bằng Markdown, có gạch đầu dòng rõ ràng để thí sinh dễ nắm bắt).",
+      "answer": "Dạ, Học viện Phụ nữ Việt Nam xin chào Quý phụ huynh và các em học sinh thân yêu! Ban tuyển sinh rất vui mừng được chia sẻ thông tin chi tiết về danh mục các ngành, chương trình đào tạo Đại học chính quy năm 2026 của Học viện.\n\nDựa trên Đề án tuyển sinh và Thông báo tuyển sinh chính",
+      "categoryMatched": "general",
+      "feedback": null,
+      "tags": [
+        "Cache-Hit"
+      ],
+      "documentReferenced": [
+        "Bộ nhớ đệm thông minh"
+      ]
+    },
+    {
       "id": "h-1780417318657",
       "timestamp": "2026-06-02T16:21:58.657Z",
       "question": "Tổng hợp các ngành đào tạo Đại học và Thạc sĩ tại Học viện Phụ nữ Việt Nam? (Hãy trả lời chi tiết, trình bày khoa học bằng Markdown, có gạch đầu dòng rõ ràng để thí sinh dễ nắm bắt).",
@@ -111,6 +125,207 @@
         "thạc sĩ"
       ],
       "documentReferenced": []
+    },
+    {
+      "id": "h-1780590153143",
+      "timestamp": "2026-06-04T16:22:33.143Z",
+      "question": "Giới thiệu tổng quan về Học viện Phụ nữ Việt Nam? (Hãy trả lời chi tiết, trình bày khoa học bằng Markdown, có gạch đầu dòng rõ ràng để thí sinh dễ nắm bắt).",
+      "answer": "...",
+      "categoryMatched": "general",
+      "feedback": null,
+      "tags": [
+        "ngành đào tạo",
+        "Giới và Phát triển"
+      ],
+      "documentReferenced": [
+        "Đề án tuyển sinh năm 2026",
+        "THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)"
+      ]
+    },
+    {
+      "id": "h-1780590196083",
+      "timestamp": "2026-06-04T16:23:16.083Z",
+      "question": " (Hãy trả lời chi tiết, trình bày khoa học bằng Markdown, có gạch đầu dòng rõ ràng để thí sinh dễ nắm bắt).",
+      "answer": "🌸 **Kính chào Quý phụ huynh và các bạn thí sinh!**\n\nBan tuyển sinh Học viện Phụ nữ Việt Nam xin gửi lời chào trân trọng nhất. Hiện tại hệ thống phản hồi tự động đang bận, Ban tư vấn học viện đã tra cứu trực tiếp từ các quyết định và văn bản tuyển sinh chính thức để hỗ trợ giải đáp nhanh nhất cho bạn:\n\n### 📄 Thông số trích lục chính thức từ Đề án tuyển sinh học viện:\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\n[KẾT QUẢ TÌM BIỂU ĐOẠN TRÍCH CHI TIẾT TỪ CHUNK RAG]:\n\n- Có đủ sức khỏe để học tập theo quy định hiện hành và không trong thời gian bị truy cứu trách nhiệm hình sự hoặc bị hạn chế các quyền dân sự liên quan đến việc học tập;\n- Có đủ thông tin cá nhân, hồ sơ dự tuyển theo quy định.\n* Trong trường hợp đối tượng dự tuyển là người khuyết tật bị suy giảm khả năng học tập, Học viện sẽ thực hiện các biện pháp cần thiết và tạo điều kiện tốt nhất để thí sinh có nguyện vọng được đăng ký dự tuyển và theo học các ngành phù hợp với điều kiện sức khỏe của thí sinh.\n* Đối với các đối tượng diện dự bị đại học thực hiện theo quy định của Bộ Giáo dục và Đào tạo và quy định của Học viện (mục 2.5).\n2. Phương thức tuyển sinh\n\n#### 🔹 Trích nghị từ văn bản: *THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)*\n\n- Có đủ sức khỏe để học tập theo quy định hiện hành và không trong thời gian bị truy cứu trách nhiệm hình sự hoặc bị hạn chế các quyền dân sự liên quan đến việc học tập;\n- Có đủ thông tin cá nhân, hồ sơ dự tuyển theo quy định.\n* Trong trường hợp đối tượng dự tuyển là người khuyết tật bị suy giảm khả năng học tập, Học viện sẽ thực hiện các biện pháp cần thiết và tạo điều kiện tốt nhất để thí sinh có nguyện vọng được đăng ký dự tuyển và theo học các ngành phù hợp với điều kiện sức khỏe của thí sinh.\n* Đối với các đối tượng diện dự bị đại học thực hiện theo quy định của Bộ Giáo dục và Đào tạo và quy định của Học viện\n11.2. Điều kiện cụ thể:\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\nTâm lý học giáo dục\nMẫu số 03: DANH MỤC NGÀNH KHÁC NGÀNH QUẢN TRỊ KINH DOANH (PHẢI HỌC BỔ SUNG KIẾN THỨC)\n1. Thí sinh tốt nghiệp đại học nhóm ngành: Ngành Tài chính - Ngân hàng; Bảo hiểm; Công nghệ tài chính; Kế toán; Kiểm toán; Khoa học quản lý; Quản lý công; Quản trị nhân lực; Hệ thống thông tin quản lý; Quản trị văn phòng; Quan hệ lao động; Quản lý dự án; Kinh tế; Kinh tế chính trị; Kinh tế đầu tư; Kinh tế phát triển; Kinh tế quốc tế; Thống kê kinh tế; Toán kinh tế phải học bổ sung kiến thức 4 môn (12 tín chỉ), bao gồm:\nHọc phần\nSố tín chỉ\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\n+ Ngành Luật và Luật Kinh tế điểm thi môn Toán và Ngữ văn, hoặc Toán, hoặc Ngữ văn của các tổ hợp ĐKXT phải ≥ 6.0 điểm (Bằng chữ: sáu phẩy không) và tổng điểm 03 môn thi tốt nghiệp THPT theo tổ hợp ĐKXT phải ≥ 18.0 điểm.\n+ Ngành Công nghệ thông tin (gồm Chương trình tiêu chuẩn và Chương trình Thiết kế và phát triển Games), điểm thi môn Toán trong các tổ hợp ĐKXT quy định theo Thông báo của Học viện tại thời điểm xét tuyển.\n+ Đối với ngành Quản trị kinh doanh (đào tạo bằng tiếng Anh), Kinh tế (đào tạo bằng tiếng Anh), thí sinh phải đạt trình độ tiếng Anh tối thiểu Bậc 3 theo khung năng lực ngoại ngữ 6 Bậc dành cho Việt Nam (Chi tiết tại Mẫu số 1 Phụ lục I, chứng chỉ ngoại ngữ tiếng Anh được cấp bởi các cơ sở có thẩm quyền theo quy định của Bộ GD&ĐT và còn thời hạn 02 năm tính đến thời điểm đăng ký xét tuyển).\nQuy định về cách tính điểm xét tuyển phương thức xét kết quả thi tốt nghiệp THPT (thang điểm 30) như sau:\nĐiểm xét tuyển  =  (Môn thi 1 + Môn thi 2 + Môn thi 3) + Điểm cộng (nếu có) + Điểm ưu tiên (nếu có)\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\n+ Điểm trung bình chung học tập cả năm lớp 10, 11, 12 của môn Toán và Ngữ văn, hoặc Toán, hoặc Ngữ văn của các tổ hợp ĐKXT phải ≥ 6.0 điểm (Bằng chữ: sáu phẩy không) và điểm trung bình chung kết quả học tập 03 môn thuộc tổ hợp ĐKXT của cả năm lớp 10, 11, 12 phải ≥ 18.0 điểm.\n- Ngành Công nghệ thông tin (gồm Chương trình tiêu chuẩn và Chương trình Thiết kế và phát triển Games), điểm trung bình chung học tập cả năm lớp 10, 11, 12 của môn Toán trong các tổ hợp ĐKXT phải ≥ 7.0 điểm (Bằng chữ: bảy phẩy không).\n- Đối với ngành Quản trị kinh doanh (đào tạo bằng tiếng Anh), Kinh tế (đào tạo bằng tiếng Anh), thí sinh phải đạt trình độ tiếng Anh tối thiểu Bậc 3 theo khung năng lực ngoại ngữ 6 Bậc dành cho Việt Nam (Chi tiết tại Mẫu số 1 Phụ lục I, chứng chỉ ngoại ngữ tiếng Anh được cấp bởi các cơ sở có thẩm quyền theo quy định của Bộ GD&ĐT và còn thời hạn 02 năm tính đến thời điểm đăng ký xét tuyển).\n- Quy định về cách tính điểm xét tuyển phương thức xét kết quả học tập THPT (thang điểm 30) như sau:\nĐiểm xét tuyển = (ĐTB Môn 1 + ĐTB Môn 2 + ĐTB Môn 3) + Điểm cộng (nếu có) + Điểm ưu tiên (nếu có)\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\n+ Đối với thí sinh sử dụng kết quả thi đánh giá năng lực do Đại học Quốc gia Hà Nội tổ chức: Theo hướng dẫn quy định của Bộ GD&ĐT.\n- Ngành Công nghệ thông tin (gồm Chương trình tiêu chuẩn và Chương trình Thiết kế và phát triển Games), điểm thi môn Toán trong các tổ hợp ĐKXT quy định theo Thông báo của Học viện tại thời điểm xét tuyển.\n- Đối với ngành Quản trị kinh doanh (đào tạo bằng tiếng Anh), Kinh tế (đào tạo bằng tiếng Anh), thí sinh phải đạt trình độ tiếng Anh tối thiểu Bậc 3 theo khung năng lực ngoại ngữ 6 Bậc dành cho Việt Nam (Chi tiết tại Mẫu số 1 Phụ lục I, chứng chỉ ngoại ngữ tiếng Anh được cấp bởi các cơ sở có thẩm quyền theo quy định của Bộ GD&ĐT và còn thời hạn 02 năm tính đến thời điểm đăng ký xét tuyển).\nHọc viện sẽ quy định về cách tính điểm trong Thông báo sau.\n6.2.5. Sử dụng phương thức khác - Mã 500 (áp dụng cho đối tượng dự bị đại học).\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\nLuật Hình sự\nTổng số\n2. Thí sinh tốt nghiệp đại học ngành/nhóm ngành: Kinh tế học, Xã hội học, Tâm lý học, Báo chí và Truyền thông, Văn thư - Lưu trữ - Bảo tàng, Tài chính - Ngân hàng - Bảo hiểm, Kế toán - Kiểm toán, Quản trị - Quản lý, Kinh doanh và quản lý phải học bổ sung kiến thức 08 học phần (28 tín chỉ), bao gồm:\nHọc phần\nSố tín chỉ\n\n#### 🔹 Trích nghị từ văn bản: *THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)*\n\n+ Ngành Luật và Luật Kinh tế điểm thi môn Toán và Ngữ văn, hoặc Toán, hoặc Ngữ văn của các tổ hợp ĐKXT phải ≥ 6.0 điểm (Bằng chữ: sáu phẩy không) và tổng điểm 03 môn thi tốt nghiệp THPT theo tổ hợp ĐKXT phải ≥ 18.0 điểm.\n+ Ngành Công nghệ thông tin (gồm Chương trình tiêu chuẩn và Chương trình Thiết kế và phát triển Game), điểm thi môn Toán trong các tổ hợp ĐKXT quy định theo Thông báo của Học viện tại thời điểm xét tuyển.\n+ Đối với chương trình đào tạo chất lượng cao ngành Quản trị kinh doanh, chương trình đào tạo chất lượng cao ngành Kinh tế thí sinh phải đạt trình độ tiếng Anh tối thiểu Bậc 3 theo khung năng lực ngoại ngữ 6 Bậc dành cho Việt Nam (Chi tiết tại Mẫu số 1 Phụ lục I, chứng chỉ ngoại ngữ tiếng Anh được cấp bởi các cơ sở có thẩm quyền theo quy định của Bộ GD&ĐT và còn thời hạn 02 năm tính đến thời điểm đăng ký xét tuyển).\nQuy định về cách tính điểm xét tuyển phương thức xét kết quả thi tốt nghiệp THPT (thang điểm 30) như sau:\nĐiểm xét tuyển  =  (Môn thi 1 + Môn thi 2 + Môn thi 3) + Điểm cộng (nếu có) + Điểm ưu tiên (nếu có)\n\n#### 🔹 Trích nghị từ văn bản: *THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)*\n\n+ Điểm trung bình chung học tập cả năm lớp 10, 11, 12 của môn Toán và Ngữ văn, hoặc Toán, hoặc Ngữ văn của các tổ hợp ĐKXT phải ≥ 6.0 điểm (Bằng chữ: sáu phẩy không) và điểm trung bình chung kết quả học tập 03 môn thuộc tổ hợp ĐKXT của cả năm lớp 10, 11, 12 phải ≥ 18.0 điểm.\n- Ngành Công nghệ thông tin (gồm Chương trình tiêu chuẩn và Chương trình Thiết kế và phát triển Game), điểm trung bình chung học tập cả năm lớp 10, 11, 12 của môn Toán trong các tổ hợp ĐKXT phải ≥ 7.0 điểm (Bằng chữ: bảy phẩy không).\n- Đối với chương trình đào tạo chất lượng cao ngành Quản trị kinh doanh, chương trình đào tạo chất lượng cao ngành Kinh tế, thí sinh phải đạt trình độ tiếng Anh tối thiểu Bậc 3 theo khung năng lực ngoại ngữ 6 Bậc dành cho Việt Nam (Chi tiết tại Mẫu số 1 Phụ lục I, chứng chỉ ngoại ngữ tiếng Anh được cấp bởi các cơ sở có thẩm quyền theo quy định của Bộ GD&ĐT và còn thời hạn 02 năm tính đến thời điểm đăng ký xét tuyển).\n- Quy định về cách tính điểm xét tuyển phương thức xét kết quả học tập THPT (thang điểm 30) như sau:\nĐiểm xét tuyển = (ĐTB Môn 1 + ĐTB Môn 2 + ĐTB Môn 3) + Điểm cộng (nếu có) + Điểm ưu tiên (nếu có)\n\n#### 🔹 Trích nghị từ văn bản: *THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)*\n\n+ Đối với thí sinh sử dụng kết quả thi đánh giá năng lực do Đại học Quốc gia Hà Nội tổ chức: Theo hướng dẫn quy định của Bộ GD&ĐT.\n- Ngành Công nghệ thông tin (gồm Chương trình tiêu chuẩn và Chương trình Thiết kế và phát triển Game), điểm thi môn Toán trong các tổ hợp ĐKXT quy định theo Thông báo của Học viện tại thời điểm xét tuyển.\n- Đối với chương trình đào tạo chất lượng cao ngành Quản trị kinh doanh, chương trình đào tạo chất lượng cao ngành Kinh tế, thí sinh phải đạt trình độ tiếng Anh tối thiểu Bậc 3 theo khung năng lực ngoại ngữ 6 Bậc dành cho Việt Nam (Chi tiết tại Mẫu số 1 Phụ lục I, chứng chỉ ngoại ngữ tiếng Anh được cấp bởi các cơ sở có thẩm quyền theo quy định của Bộ GD&ĐT và còn thời hạn 02 năm tính đến thời điểm đăng ký xét tuyển).\nHọc viện sẽ quy định về cách tính điểm trong Thông báo sau.\nPhương thức 5: Sử dụng phương thức khác (áp dụng cho đối tượng dự bị đại học)\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\n- Thí sinh đã tốt nghiệp THPT, hoàn thành chương trình dự bị đại học và có tổng điểm trung bình chung kết quả học tập 03 môn thuộc tổ hợp ĐKXT của  năm lớp 10, 11, 12 đạt ngưỡng đầu vào do Học viện công bố trong thông báo tuyển sinh.\n- Có văn bản của trường nơi học sinh học dự bị đại học và hồ sơ của học sinh gửi về Học viện để xét tuyển.\n* Nguyên tắc xét tuyển:\n\n#### 🔹 Trích nghị từ văn bản: *THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)*\n\n- Thí sinh đã tốt nghiệp THPT, hoàn thành chương trình dự bị đại học và có tổng điểm trung bình chung kết quả học tập 03 môn thuộc tổ hợp ĐKXT của  năm lớp 10, 11, 12 đạt ngưỡng đầu vào do Học viện công bố trong thông báo tuyển sinh.\n- Có văn bản của trường nơi học sinh học dự bị đại học và hồ sơ của học sinh gửi về Học viện để xét tuyển.\nNguyên tắc xét tuyển:\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\nTổng điểm cộng (gồm điểm thưởng, điểm xét thưởng, điểm khuyến khích) không vượt quá 10% điểm tối đa của thang điểm xét tuyển.\n5.2.1. Điểm thưởng (theo thang điểm 30) đối với thí sinh được xét tuyển thẳng nhưng không dùng quyền xét tuyển thẳng.\nThí sinh đoạt giải nhất, nhì, ba trong kỳ thi chọn học sinh giỏi quốc gia, quốc tế hoặc thi khoa học kỹ thuật cấp quốc gia, quốc tế có liên quan đến các ngành đào tạo của Học viện do Bộ GD&ĐT tổ chức, cử tham gia; thời gian đạt giải không quá 03 năm tính đến thời điểm xét tuyển được cộng 3.0 điểm\n5.2.2. Điểm xét thưởng (theo thang điểm 30) đối với thí sinh có thành tích đặc biệt\nThành tích\n\n#### 🔹 Trích nghị từ văn bản: *THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)*\n\nTổng điểm cộng (gồm điểm thưởng, điểm xét thưởng, điểm khuyến khích) không vượt quá 10% điểm tối đa của thang điểm xét tuyển.\n12.1. Điểm thưởng (theo thang điểm 30) đối với thí sinh được xét tuyển thẳng nhưng không dùng quyền xét tuyển thẳng\nThí sinh đoạt giải nhất, nhì, ba trong kỳ thi chọn học sinh giỏi quốc gia, quốc tế hoặc thi khoa học kỹ thuật cấp quốc gia, quốc tế có liên quan đến các ngành đào tạo của Học viện do Bộ GD&ĐT tổ chức, cử tham gia; thời gian đạt giải không quá 03 năm tính đến thời điểm xét tuyển được cộng 3.0 điểm.\n12.2. Điểm xét thưởng (theo thang điểm 30) đối với thí sinh có thành tích đặc biệt\nThành tích\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\n- Đối với thí sinh có chứng chỉ tiếng Anh, Chứng chỉ SAT, chứng nhận đạt giải học sinh giỏi các môn văn hóa để cộng điểm: Học viện sẽ có thông báo tuyển sinh.\n6.2. Điều kiện xét tuyển\nThí sinh xét tuyển các phương thức (trừ thí sinh đặc cách xét tốt nghiệp, thí sinh thuộc đối tượng xét tuyển thẳng và thí sinh quy định tại khoản 3, khoản 4 điều 8 Quy chế tuyển sinh của Bộ GD&ĐT) phải đáp ứng các điều kiện: Thí sinh có tổng điểm 03 môn thi kỳ thi tốt nghiệp THPT (kỳ thi trung học nghề đối với đối tượng trung học nghề) theo tổ hợp xét tuyển (môn Toán, Ngữ văn và một môn thi khác) phải ≥ 15.0 điểm trên thang điểm 30, áp dụng đối với thí sinh thi tốt nghiệp THPT từ năm 2026.\n6.2.1. Xét tuyển thẳng theo quy định của Quy chế tuyển sinh của Bộ GD&ĐT và Quy chế tuyển sinh Học viện Phụ nữ Việt Nam – Mã 301.\nĐối tượng xét tuyển thẳng gồm:\n\n#### 🔹 Trích nghị từ văn bản: *THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)*\n\nThí sinh xét tuyển các phương thức (trừ thí sinh đặc cách xét tốt nghiệp, thí sinh thuộc đối tượng xét tuyển thẳng và thí sinh quy định tại khoản 3, khoản 4 điều 8 Quy chế tuyển sinh của Bộ GD&ĐT) phải đáp ứng các điều kiện: Thí sinh có tổng điểm 03 môn thi kỳ thi tốt nghiệp THPT (kỳ thi trung học nghề đối với đối tượng trung học nghề) theo tổ hợp xét tuyển (môn Toán, Ngữ văn và một môn thi khác) phải ≥ 15.0 điểm trên thang điểm 30, áp dụng đối với thí sinh thi tốt nghiệp THPT từ năm 2026.\nPhương thức 1: Xét tuyển thẳng theo quy định của Quy chế tuyển sinh của Bộ GD&ĐT và Quy chế tuyển sinh Học viện Phụ nữ Việt Nam\n* Đối tượng xét tuyển thẳng gồm:\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\n3. Mục tiêu nghề nghiệp tương lai\n4. Vấn đề quan tâm, dự kiến và đề xuất hướng nghiên cứu ứng dụng. Bài luận dự tuyển chuyên ngành theo định hướng nghiên cứu/ứng dụng cần tập trung vào các dự kiến nghiên cứu/ứng dụng tương ứng.\nBài luận chuyên ngành của người xét tuyển có nội dung phù hợp với chuyên ngành đăng ký dự tuyển trình độ thạc sĩ, phản ánh trí tuệ, những điểm mạnh và tích cực của người viết, văn phong trong sáng, trình bày rõ ràng, qua đó cung cấp một hình ảnh rõ nét về người dự tuyển với những thông tin mới (không lặp lại những thông tin đã hiển thị trong hồ sơ như kết quả học tập, nghiên cứu,…)\nMột số quy định:\n- Không đưa thông tin cá nhân của ứng viên như họ tên vào các trang trong bài luận ngoại trừ trang bìa.\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\n(1) Anh hùng lao động, Anh hùng lực lượng vũ trang nhân dân, Chiến sĩ thi đua toàn quốc được tuyển thẳng vào các ngành, chương trình do Học viện quy định.\n(2) Thí sinh đoạt giải nhất, nhì, ba trong kỳ thi chọn học sinh giỏi quốc gia, quốc tế hoặc thi khoa học, kỹ thuật cấp quốc gia, quốc tế có liên quan các ngành đào tạo của Học viện do Bộ GD&ĐT tổ chức, cử tham gia; thời gian đoạt giải không quá 3 năm tính tới thời điểm xét tuyển thẳng.\n(3) Giám đốc Học viện căn cứ kết quả học tập cấp THPT của thí sinh và yêu cầu đầu vào của chương trình đào tạo do Hiệu trưởng quy định xem xét, quyết định nhận vào học những trường hợp quy định dưới đây (trường hợp cần thiết kèm theo điều kiện thí sinh phải học 01 năm bổ sung kiến thức trước khi vào học chính thức):\n- Thí sinh là người nước ngoài đã đạt chuẩn năng lực ngôn ngữ theo yêu cầu của chương trình đào tạo phù hợp với quy định của Bộ GDĐT;\n\n#### 🔹 Trích nghị từ văn bản: *THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)*\n\n(1) Anh hùng lao động, Anh hùng lực lượng vũ trang nhân dân, Chiến sĩ thi đua toàn quốc được tuyển thẳng vào các ngành, chương trình do Học viện quy định.\n(2) Thí sinh đoạt giải nhất, nhì, ba trong kỳ thi chọn học sinh giỏi quốc gia, quốc tế hoặc thi khoa học, kỹ thuật cấp quốc gia, quốc tế có liên quan các ngành đào tạo của Học viện do Bộ GD&ĐT tổ chức, cử tham gia; thời gian đoạt giải không quá 3 năm tính tới thời điểm xét tuyển thẳng.\n(3) Giám đốc Học viện căn cứ kết quả học tập cấp THPT của thí sinh và yêu cầu đầu vào của chương trình đào tạo do Hiệu trưởng quy định xem xét, quyết định nhận vào học những trường hợp quy định dưới đây (trường hợp cần thiết kèm theo điều kiện thí sinh phải học 01 năm bổ sung kiến thức trước khi vào học chính thức):\n- Thí sinh là người nước ngoài đã đạt chuẩn năng lực ngôn ngữ theo yêu cầu của chương trình đào tạo phù hợp với quy định của Bộ GDĐT;\n\n\n---\n📞 **Hotline tuyển sinh chính thức:** 024.3775.1750\n🏢 **Học viện Phụ nữ Việt Nam:** Số 68 đường Nguyễn Chí Thanh, phường Láng Thượng, quận Đống Đa, TP. Hà Nội.\n*⚠️ Lưu ý: Nội dung phản hồi được rà soát trực tiếp từ tài liệu tuyển sinh chính thức của Học viện.*",
+      "categoryMatched": "general",
+      "feedback": null,
+      "tags": [
+        "ngành đào tạo"
+      ],
+      "documentReferenced": [
+        "Đề án tuyển sinh năm 2026",
+        "THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)"
+      ]
+    },
+    {
+      "id": "h-1780590285590",
+      "timestamp": "2026-06-04T16:24:45.590Z",
+      "question": "Các ngành tuyển sinh Đại học chính quy năm nay? (Hãy trả lời chi tiết, trình bày khoa học bằng Markdown, có gạch đầu dòng rõ ràng để thí sinh dễ nắm bắt).",
+      "answer": "🌸 **Kính chào Quý phụ huynh và các bạn thí sinh!**\n\nBan tuyển sinh Học viện Phụ nữ Việt Nam xin gửi lời chào trân trọng nhất. Hiện tại hệ thống phản hồi tự động đang bận, Ban tư vấn học viện đã tra cứu trực tiếp từ các quyết định và văn bản tuyển sinh chính thức để hỗ trợ giải đáp nhanh nhất cho bạn:\n\n### 📄 Thông số trích lục chính thức từ Đề án tuyển sinh học viện:\n\n#### 🔹 Trích nghị từ văn bản: *THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)*\n\n[KẾT QUẢ TÌM BIỂU ĐOẠN TRÍCH CHI TIẾT TỪ CHUNK RAG]:\n\nTHÔNG BÁO\nTuyển sinh Đại học chính quy năm 2026\nHọc viện Phụ nữ Việt Nam (Học viện) là cơ sở giáo dục đại học công lập đạt chuẩn kiểm định chất lượng giáo dục quốc gia và đạt tiêu chuẩn chất lượng chương trình đào tạo. Căn cứ Kế hoạch tuyển sinh đại học chính quy năm 2026, Quy chế tuyển sinh đại học và Thông tin tuyển sinh năm 2026, Học viện Phụ nữ Việt Nam thông báo tuyển sinh đại học chính quy năm 2026 như sau:\n1. Ký hiệu trường: HPN.\n2. Tên cơ sở đào đạo: Học viện Phụ nữ Việt Nam.\n\n#### 🔹 Trích nghị từ văn bản: *THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)*\n\nHà Nội, ngày        tháng       năm 2026\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\n10. Các nội dung khác\n10.1. Học phí dự kiến với sinh viên chính quy:\nTheo quy định của Nhà nước cho các trường đại học công lập: Dự kiến 575.000-630.000 VNĐ/tín chỉ hệ đại học chính quy (tùy thuộc từng ngành/ chương trình đào tạo). Học phí có sự điều chỉnh theo năm học, theo quy định của Nhà nước đối với các trường tự chủ hoàn toàn chi thường xuyên.\n10.2. Ký túc xá: 1280 chỗ nội trú.\n10.3. Chế độ ưu đãi của Học viện\n\n#### 🔹 Trích nghị từ văn bản: *THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)*\n\n- Lệ phí rà soát hồ sơ tuyển sinh: 50.000 đồng/hồ sơ.\n- Lệ phí xác minh chứng chỉ/ chứng nhận đầu vào: 200.000 đồng/chứng chỉ.\t\t16. Học phí\nTheo quy định của Nhà nước cho các trường đại học công lập: Dự kiến 575.000 - 630.000 VNĐ/tín chỉ hệ đại học chính quy (tùy thuộc từng ngành/ chương trình đào tạo). Học phí có sự điều chỉnh theo năm học, theo quy định của Nhà nước đối với các trường tự chủ hoàn toàn chi thường xuyên./.\nNơi nhận:\n- Website Học viện; Website Tuyển sinh;\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\n5. Chính sách ưu tiên\n5.1. Đối tượng ưu tiên trong tuyển sinh\na) Người có thời gian công tác liên tục từ hai năm trở lên (tính đến ngày hết hạn nộp hồ sơ đăng ký dự tuyển) tại các địa phương được quy định là Khu vực 1 trong quy định của Bộ Giáo dục và Đào tạo về tuyển sinh đại học, cao đẳng ngành Giáo dục Mầm non;\nb) Thương binh, người hưởng chính sách như thương binh;\nc) Con liệt sĩ;\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\n3. Quy tắc quy đổi tương đương ngưỡng đầu vào và điểm trúng tuyển giữa các tổ hợp, phương thức tuyển sinh\t6\n4. Số lượng tuyển sinh\t6\n4.1. Số lượng tuyển sinh đại học năm 2026 (dự kiến)\t6\n4.2. Mã tổ hợp xét tuyển:\t9\n5. Các thông tin cần thiết khác về điều kiện phụ trong xét tuyển, điểm cộng, tiêu chí phân ngành, chương trình đào tạo\t9\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\nHọc viện sẽ công bố theo kế hoạch chung của Bộ GD&ĐT.\n4. Số lượng tuyển sinh\n4.1. Số lượng tuyển sinh đại học năm 2026 (dự kiến)\nMã xét tuyển\nTên chương trình, ngành, nhóm ngành xét tuyển\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\n7. Địa chỉ công khai các thông tin về hoạt động của cơ sở đào tạo\t5\n8. Tra cứu và tham khảo các ngành, chương trình đào tạo tuyển sinh:\t5\nII. Tuyển sinh đại học\t5\n1. Đối tượng, điều kiện dự tuyển\t5\n1.1. Đối tượng dự tuyển\t5\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\n- Website: https://hvpnvn.edu.vn/gioi-thieu/3-cong-khai/cong-khai-dieu-kien-dam-bao-clgd/.\n8. Tra cứu và tham khảo các ngành, chương trình đào tạo tuyển sinh:\nII. Tuyển sinh đại học\n1. Đối tượng, điều kiện dự tuyển\n1.1. Đối tượng dự tuyển\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\n- Có đủ sức khỏe để học tập theo quy định hiện hành và không trong thời gian bị truy cứu trách nhiệm hình sự hoặc bị hạn chế các quyền dân sự liên quan đến việc học tập;\n- Có đủ thông tin cá nhân, hồ sơ dự tuyển theo quy định.\n* Trong trường hợp đối tượng dự tuyển là người khuyết tật bị suy giảm khả năng học tập, Học viện sẽ thực hiện các biện pháp cần thiết và tạo điều kiện tốt nhất để thí sinh có nguyện vọng được đăng ký dự tuyển và theo học các ngành phù hợp với điều kiện sức khỏe của thí sinh.\n* Đối với các đối tượng diện dự bị đại học thực hiện theo quy định của Bộ Giáo dục và Đào tạo và quy định của Học viện (mục 2.5).\n2. Phương thức tuyển sinh\n\n#### 🔹 Trích nghị từ văn bản: *THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)*\n\n- Có đủ sức khỏe để học tập theo quy định hiện hành và không trong thời gian bị truy cứu trách nhiệm hình sự hoặc bị hạn chế các quyền dân sự liên quan đến việc học tập;\n- Có đủ thông tin cá nhân, hồ sơ dự tuyển theo quy định.\n* Trong trường hợp đối tượng dự tuyển là người khuyết tật bị suy giảm khả năng học tập, Học viện sẽ thực hiện các biện pháp cần thiết và tạo điều kiện tốt nhất để thí sinh có nguyện vọng được đăng ký dự tuyển và theo học các ngành phù hợp với điều kiện sức khỏe của thí sinh.\n* Đối với các đối tượng diện dự bị đại học thực hiện theo quy định của Bộ Giáo dục và Đào tạo và quy định của Học viện\n11.2. Điều kiện cụ thể:\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\nf- Ứng viên dự tuyển là công dân nước ngoài phải đạt trình độ tiếng Việt từ Bậc 4 trở lên theo Khung năng lực tiếng Việt dùng cho người nước ngoài hoặc đã tốt nghiệp đại học (hoặc trình độ tương đương trở lên) mà chương trình đào tạo được giảng dạy bằng tiếng Việt và đáp ứng các Điểm a, d Khoản 1 Điều này (lý lịch và nhân thân của thí sinh cần được Đại sứ quán xác nhận, trường hợp cần thiết có thể lấy thêm xác nhận của cơ quan an ninh văn hóa).\n2. Phương thức tuyển sinh\n- Xét tuyển thẳng: Thí sinh đã tốt nghiệp đại học trong thời gian 2 năm (đến thời điểm tuyển sinh thạc sĩ) có mức xếp loại tốt nghiệp từ loại Giỏi trở lên đủ điều kiện về ngoại ngữ được xét tuyển thẳng thạc sĩ ngành/chương trình đào tạo tương ứng; trong trường hợp bằng tốt nghiệp đại học của thí sinh không đúng ngành, thí sinh phải học bổ sung kiến thức theo quy định để đảm bảo quyền ưu tiên tuyển thẳng.\n- Xét tuyển theo hình thức trình bày bài luận và phỏng vấn: Thí sinh dự tuyển không thuộc đối tượng tuyển thẳng sẽ tham gia xét tuyển theo hình thức trình bày bài luận và phỏng vấn (hướng dẫn mẫu bài luận theo Mẫu số 08 - Phụ lục I).\n3. Số lượng tuyển sinh (Dự kiến)\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\nTâm lý học giáo dục\nMẫu số 03: DANH MỤC NGÀNH KHÁC NGÀNH QUẢN TRỊ KINH DOANH (PHẢI HỌC BỔ SUNG KIẾN THỨC)\n1. Thí sinh tốt nghiệp đại học nhóm ngành: Ngành Tài chính - Ngân hàng; Bảo hiểm; Công nghệ tài chính; Kế toán; Kiểm toán; Khoa học quản lý; Quản lý công; Quản trị nhân lực; Hệ thống thông tin quản lý; Quản trị văn phòng; Quan hệ lao động; Quản lý dự án; Kinh tế; Kinh tế chính trị; Kinh tế đầu tư; Kinh tế phát triển; Kinh tế quốc tế; Thống kê kinh tế; Toán kinh tế phải học bổ sung kiến thức 4 môn (12 tín chỉ), bao gồm:\nHọc phần\nSố tín chỉ\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\nHọc viện sẽ quy định về cách tính điểm trong Thông báo sau.\n6.2.5. Sử dụng phương thức khác - Mã 500 (áp dụng cho đối tượng dự bị đại học).\n- Thí sinh đã tốt nghiệp THPT, hoàn thành chương trình dự bị đại học và có tổng điểm trung bình chung kết quả học tập 03 môn thuộc tổ hợp ĐKXT của  năm lớp 10, 11, 12 đạt ngưỡng đầu vào do Học viện công bố trong thông báo tuyển sinh.\n- Có văn bản của trường nơi học sinh học dự bị đại học và hồ sơ của học sinh gửi về Học viện để xét tuyển.\n* Nguyên tắc xét tuyển:\n\n#### 🔹 Trích nghị từ văn bản: *THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)*\n\nHọc viện sẽ quy định về cách tính điểm trong Thông báo sau.\nPhương thức 5: Sử dụng phương thức khác (áp dụng cho đối tượng dự bị đại học)\n- Thí sinh đã tốt nghiệp THPT, hoàn thành chương trình dự bị đại học và có tổng điểm trung bình chung kết quả học tập 03 môn thuộc tổ hợp ĐKXT của  năm lớp 10, 11, 12 đạt ngưỡng đầu vào do Học viện công bố trong thông báo tuyển sinh.\n- Có văn bản của trường nơi học sinh học dự bị đại học và hồ sơ của học sinh gửi về Học viện để xét tuyển.\nNguyên tắc xét tuyển:\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\n- Đối với thí sinh có chứng chỉ tiếng Anh, Chứng chỉ SAT, chứng nhận đạt giải học sinh giỏi các môn văn hóa để cộng điểm: Học viện sẽ có thông báo tuyển sinh.\n6.2. Điều kiện xét tuyển\nThí sinh xét tuyển các phương thức (trừ thí sinh đặc cách xét tốt nghiệp, thí sinh thuộc đối tượng xét tuyển thẳng và thí sinh quy định tại khoản 3, khoản 4 điều 8 Quy chế tuyển sinh của Bộ GD&ĐT) phải đáp ứng các điều kiện: Thí sinh có tổng điểm 03 môn thi kỳ thi tốt nghiệp THPT (kỳ thi trung học nghề đối với đối tượng trung học nghề) theo tổ hợp xét tuyển (môn Toán, Ngữ văn và một môn thi khác) phải ≥ 15.0 điểm trên thang điểm 30, áp dụng đối với thí sinh thi tốt nghiệp THPT từ năm 2026.\n6.2.1. Xét tuyển thẳng theo quy định của Quy chế tuyển sinh của Bộ GD&ĐT và Quy chế tuyển sinh Học viện Phụ nữ Việt Nam – Mã 301.\nĐối tượng xét tuyển thẳng gồm:\n\n#### 🔹 Trích nghị từ văn bản: *THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)*\n\nThí sinh xét tuyển các phương thức (trừ thí sinh đặc cách xét tốt nghiệp, thí sinh thuộc đối tượng xét tuyển thẳng và thí sinh quy định tại khoản 3, khoản 4 điều 8 Quy chế tuyển sinh của Bộ GD&ĐT) phải đáp ứng các điều kiện: Thí sinh có tổng điểm 03 môn thi kỳ thi tốt nghiệp THPT (kỳ thi trung học nghề đối với đối tượng trung học nghề) theo tổ hợp xét tuyển (môn Toán, Ngữ văn và một môn thi khác) phải ≥ 15.0 điểm trên thang điểm 30, áp dụng đối với thí sinh thi tốt nghiệp THPT từ năm 2026.\nPhương thức 1: Xét tuyển thẳng theo quy định của Quy chế tuyển sinh của Bộ GD&ĐT và Quy chế tuyển sinh Học viện Phụ nữ Việt Nam\n* Đối tượng xét tuyển thẳng gồm:\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\nLuật Hình sự\nTổng số\n2. Thí sinh tốt nghiệp đại học ngành/nhóm ngành: Kinh tế học, Xã hội học, Tâm lý học, Báo chí và Truyền thông, Văn thư - Lưu trữ - Bảo tàng, Tài chính - Ngân hàng - Bảo hiểm, Kế toán - Kiểm toán, Quản trị - Quản lý, Kinh doanh và quản lý phải học bổ sung kiến thức 08 học phần (28 tín chỉ), bao gồm:\nHọc phần\nSố tín chỉ\n\n#### 🔹 Trích nghị từ văn bản: *Đề án tuyển sinh năm 2026*\n\nMẫu số 06: DANH MỤC NGÀNH KHÁC NGÀNH KINH TẾ HỌC\n(PHẢI HỌC BỔ SUNG KIẾN THỨC)\n1. Người tốt nghiệp đại học các ngành: Quản lý kinh tế; Quản trị kinh doanh; Marketing; Bất động sản; Kinh doanh quốc tế; Kinh doanh thương mại; Thương mại điện tử; Tài chính – Ngân hàng; Bảo hiểm; Công nghệ tài chính; Kế toán; Kiểm toán; Khoa học quản lý; Quản lý công; Quản trị nhân lực; Hệ thống thông tin quản lý phải học bổ sung kiến thức 6 học phần (18 tín chỉ), bao gồm:\nTên học phần\nSố tín chỉ\n\n\n---\n📞 **Hotline tuyển sinh chính thức:** 024.3775.1750\n🏢 **Học viện Phụ nữ Việt Nam:** Số 68 đường Nguyễn Chí Thanh, phường Láng Thượng, quận Đống Đa, TP. Hà Nội.\n*⚠️ Lưu ý: Nội dung phản hồi được rà soát trực tiếp từ tài liệu tuyển sinh chính thức của Học viện.*",
+      "categoryMatched": "ug",
+      "feedback": null,
+      "tags": [
+        "ngành đào tạo"
+      ],
+      "documentReferenced": [
+        "THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)",
+        "Đề án tuyển sinh năm 2026"
+      ]
+    },
+    {
+      "id": "h-1780590506962",
+      "timestamp": "2026-06-04T16:28:26.962Z",
+      "question": "Các ngành tuyển sinh Đại học chính quy năm nay? (Hãy trả lời chi tiết, trình bày khoa học bằng Markdown, có gạch đầu dòng rõ ràng để thí sinh dễ nắm bắt).",
+      "answer": "Dạ, Học viện Phụ nữ Việt Nam (mã trường **HPN**) xin",
+      "categoryMatched": "ug",
+      "feedback": null,
+      "tags": [
+        "ngành đào tạo"
+      ],
+      "documentReferenced": [
+        "THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)",
+        "Đề án tuyển sinh năm 2026"
+      ]
+    },
+    {
+      "id": "h-1780590658524",
+      "timestamp": "2026-06-04T16:30:58.524Z",
+      "question": "Các ngành tuyển sinh Đại học chính quy năm nay? (Hãy trả lời chi tiết, trình bày khoa học bằng Markdown, có gạch đầu dòng rõ ràng để thí sinh dễ nắm bắt).",
+      "answer": "Dạ, Học viện Phụ nữ Việt Nam xin chào Quý phụ huynh và các em học sinh thân",
+      "categoryMatched": "ug",
+      "feedback": null,
+      "tags": [
+        "ngành đào tạo"
+      ],
+      "documentReferenced": [
+        "THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)",
+        "Đề án tuyển sinh năm 2026"
+      ]
+    },
+    {
+      "id": "h-1780590984538",
+      "timestamp": "2026-06-04T16:36:24.538Z",
+      "question": "Các ngành tuyển sinh Đại học chính quy năm nay? (Hãy trả lời chi tiết, trình bày khoa học bằng Markdown, có gạch đầu dòng rõ ràng để thí sinh dễ nắm bắt).",
+      "answer": "Dạ, Học viện Phụ nữ Việt Nam xin chào Quý phụ huynh cùng các em học sinh",
+      "categoryMatched": "ug",
+      "feedback": null,
+      "tags": [
+        "ngành đào tạo"
+      ],
+      "documentReferenced": [
+        "THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)",
+        "Đề án tuyển sinh năm 2026"
+      ]
+    },
+    {
+      "id": "h-1780591266857",
+      "timestamp": "2026-06-04T16:41:06.857Z",
+      "question": "Các ngành tuyển sinh Đại học chính quy năm nay? (Hãy trả lời chi tiết, trình bày khoa học bằng Markdown, có gạch đầu dòng rõ ràng để thí sinh dễ nắm bắt).",
+      "answer": "Dạ, Học viện Phụ nữ Việt Nam xin chào Quý phụ huynh và các em học sinh thân yêu! Ban tuyển sinh rất vui mừng được chia sẻ thông tin chi tiết về danh mục các ngành, chương trình đào tạo Đại học chính quy năm 2026 của Học viện.\n\nDựa trên Đề án tuyển sinh và Thông báo tuyển sinh chính",
+      "categoryMatched": "ug",
+      "feedback": null,
+      "tags": [
+        "ngành đào tạo"
+      ],
+      "documentReferenced": [
+        "THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)",
+        "Đề án tuyển sinh năm 2026"
+      ]
+    },
+    {
+      "id": "h-1780591449006",
+      "timestamp": "2026-06-04T16:44:09.006Z",
+      "question": "Bảng học phí đại học và thạc sĩ tại trường như thế nào? (Hãy trả lời chi tiết, trình bày khoa học bằng Markdown, có gạch đầu dòng rõ ràng để thí sinh dễ nắm bắt).",
+      "answer": "Dạ, Học viện Phụ nữ Việt Nam xin chào Quý phụ huynh và các bạn học sinh, học viên thân yêu! Ban tuyển sinh nhà trường xin được chia sẻ thông tin chi tiết và chính xác nhất về học phí đại học và thạc sĩ của Học viện dựa theo các tài liệu tuyển sinh chính thống như sau ạ:\n\n### 1. Học phí Hệ Đại học Chính quy (Dự kiến năm 2026)\nHọc phí của Học viện áp dụng theo quy định của Nhà nước dành cho các cơ sở giáo dục đại học công lập, cụ thể:\n- **Mức học phí dự kiến**: Từ **575.000 VNĐ** đến **630.000 VNĐ/tín chỉ**.\n- **Lưu ý**: Mức học phí cụ thể sẽ tùy thuộc vào từng ngành hoặc chương trình đào tạo mà em lựa chọn. Học phí sẽ có sự điều chỉnh theo từng năm học theo quy định của Nhà nước đối với các trường tự chủ hoàn toàn chi thường xuyên.\n\n### 2. Học phí Hệ Đào tạo Thạc sĩ\n- Dạ, hiện tại trong nguồn dữ liệu đề án tuyển sinh chính thức được cung cấp chưa có thông tin chi tiết về mức học phí cụ thể (số tiền/tín chỉ hoặc học kỳ) dành cho bậc đào tạo Thạc sĩ. \n- Tuy nhiên, khi tham gia học tập, học viên sẽ thực hiện các nghĩa vụ tài chính và đóng học phí theo quy định chung của Nhà nước đối với hệ đào tạo sau đại học tại các trường công lập và các quy định tài chính hiện hành của Học viện.\n\nĐể được hỗ trợ giải đáp nhanh chóng và đầy đủ nhất về học phí thạc sĩ cũng như các chương trình học bổng sau đại học, Quý học viên vui lòng liên hệ trực tiếp qua số Hotline tuyển sinh của Học viện: **024.3775.1750** hoặc trang Fanpage chính thức: *Tuyển sinh Học viện Phụ nữ Việt Nam* để các thầy cô tư vấn chi tiết nhất ạ!\n\n*⚠️ Thông tin được tra cứu và trích xuất trực tiếp từ các tài liệu tuyển sinh chính thống của Học viện Phụ nữ Việt Nam.*",
+      "categoryMatched": "general",
+      "feedback": null,
+      "tags": [
+        "học phí",
+        "ngành đào tạo",
+        "thạc sĩ"
+      ],
+      "documentReferenced": [
+        "Đề án tuyển sinh năm 2026",
+        "THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)"
+      ]
+    },
+    {
+      "id": "h-1780591848559",
+      "timestamp": "2026-06-04T16:50:48.559Z",
+      "question": "Các ngành tuyển sinh Đại học chính quy năm nay? (Hãy trả lời theo phong cách ngắn gọn, súc tích nhất, tập trung trực tiếp vào con số và thông tin cốt lõi khoảng 2-3 câu).",
+      "answer": "Năm 2026, Học viện Phụ nữ Việt Nam tuyển sinh **12** ngành đại học chính quy với tổng chỉ tiêu dự kiến là **2.290** sinh viên tại Hà Nội và cơ sở TP. Hồ Chí Minh. Các ngành đào tạo bao gồm: Quản trị kinh doanh, Luật, Luật kinh tế, Công nghệ thông tin, Công tác xã hội, Giới và Phát triển, Quản trị dịch vụ du lịch và lữ hành, Truyền thông đa phương tiện, Kinh tế, Tâm lý học, Kinh tế số và Marketing.",
+      "categoryMatched": "ug",
+      "feedback": null,
+      "tags": [
+        "ngành đào tạo"
+      ],
+      "documentReferenced": [
+        "THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)",
+        "Đề án tuyển sinh năm 2026"
+      ]
+    },
+    {
+      "id": "h-1780591882476",
+      "timestamp": "2026-06-04T16:51:22.476Z",
+      "question": "Chỉ tiêu chi tiết của từng ngành đào tạo năm 2026 là bao nhiêu? (Hãy trả lời theo phong cách ngắn gọn, súc tích nhất, tập trung trực tiếp vào con số và thông tin cốt lõi khoảng 2-3 câu).",
+      "answer": "Năm 2026, Học viện Phụ nữ Việt Nam tuyển sinh tổng cộng **2290** chỉ tiêu đại học chính quy tại cả cơ sở Hà Nội và TP. Hồ Chí Minh. Các ngành có chỉ tiêu lớn tại Hà Nội gồm Công nghệ thông tin (**7480201** - 250 chỉ tiêu), Công tác xã hội (**7760101** - 220 chỉ tiêu), Truyền thông đa phương tiện (**7320104** - 200 chỉ tiêu), còn tại phân hiệu TP. Hồ Chí Minh có ngành Công tác xã hội và Quản trị dịch vụ du lịch và lữ hành với **70** chỉ tiêu cho mỗi ngành. Thí sinh có thể chọn các tổ hợp xét tuyển tương ứng như **A00**, **A01**, **C00**, **D01** tùy theo từng ngành học cụ thể.",
+      "categoryMatched": "unknown",
+      "feedback": null,
+      "tags": [
+        "ngành đào tạo"
+      ],
+      "documentReferenced": [
+        "THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)",
+        "Đề án tuyển sinh năm 2026"
+      ]
+    },
+    {
+      "id": "h-1780591927076",
+      "timestamp": "2026-06-04T16:52:07.076Z",
+      "question": "Chỉ tiêu chi tiết của từng ngành đào tạo năm 2026 là bao nhiêu? TS (Hãy trả lời chi tiết, trình bày khoa học bằng Markdown, có gạch đầu dòng rõ ràng để thí sinh dễ nắm bắt).",
+      "answer": "Chỉ tiêu tuyển sinh đại học chính quy năm 2026 của Học viện Phụ nữ Việt Nam (mã trường: **HPN**) dự kiến là **2290** chỉ tiêu, cụ thể từng ngành như sau:\n\n### I. Đào tạo tại cơ sở Hà Nội\n* **Quản trị kinh doanh** (Mã ngành: **7340101**) - Tổng: **190** chỉ tiêu\n  - Chương trình tiêu chuẩn: **160** chỉ tiêu (Tổ hợp: **A00**, **A01**, **C00**, **C03**, **D01**, **D14**, **D15**)\n  - Chương trình bằng tiếng Anh / chất lượng cao: **30** chỉ tiêu (Tổ hợp: **A00**, **A01**, **C00**, **C03**, **D01**, **D14**, **D15**)\n* **Luật** (Mã ngành: **7380101**) - **180** chỉ tiêu (Tổ hợp: **A00**, **A01**, **C00**, **D01**, **D14**, **D15**)\n* **Luật kinh tế** (Mã ngành: **7380107**) - **120** chỉ tiêu (Tổ hợp: **A00**, **A01**, **C00**, **D01**, **D14**, **D15**)\n* **Công nghệ thông tin** (Mã ngành: **7480201**) - Tổng: **250** chỉ tiêu\n  - Chương trình tiêu chuẩn: **180** chỉ tiêu (Tổ hợp: **A00**, **A01**, **D01**, **D09**, **X06**, **X26**)\n  - Chương trình Thiết kế và phát triển Games/Game: **70** chỉ tiêu (Tổ hợp: **A00**, **A01**, **D01**, **D09**, **X06**, **X26**)\n* **Công tác xã hội** (Mã ngành: **7760101**) - Tổng: **220** chỉ tiêu\n  - Chương trình tiêu chuẩn: **140** chỉ tiêu (Tổ hợp: **C00**, **C03**, **D01**, **D14**, **D15**)\n  - Chương trình Phát triển và quản lý dịch vụ xã hội: **80** chỉ tiêu (Tổ hợp: **C00**, **C03**, **D01**, **D14**, **D15**)\n* **Giới và Phát triển** (Mã ngành: **7310399**) - **150** chỉ tiêu (Tổ hợp: **C00**, **C03**, **D01**, **D09**, **D14**, **D15**)\n* **Quản trị dịch vụ du lịch và lữ hành** (Mã ngành: **7810103**) - **160** chỉ tiêu (Tổ hợp: **A00**, **A01**, **C00**, **C03**, **D01**, **D14**, **D15**)\n* **Truyền thông đa phương tiện** (Mã ngành: **7320104**) - Tổng: **200** chỉ tiêu\n  - Chương trình tiêu chuẩn: **130** chỉ tiêu (Tổ hợp: **C00**, **C03**, **D01**, **D14**, **D15**)\n  - Chương trình Truyền thông xã hội: **70** chỉ tiêu (Tổ hợp: **C00**, **C03**, **D01**, **D14**, **D15**)\n* **Kinh tế** (Mã ngành: **7310101**) - Tổng: **19",
+      "categoryMatched": "general",
+      "feedback": null,
+      "tags": [
+        "ngành đào tạo"
+      ],
+      "documentReferenced": [
+        "Đề án tuyển sinh năm 2026",
+        "THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)"
+      ]
+    },
+    {
+      "id": "h-1780592217822",
+      "timestamp": "2026-06-04T16:56:57.822Z",
+      "question": "Các ngành tuyển sinh Đại học chính quy năm nay? (Hãy trả lời chi tiết, trình bày khoa học bằng Markdown, có gạch đầu dòng rõ ràng để thí sinh dễ nắm bắt).",
+      "answer": "Dưới đây là danh sách chi tiết các ngành, chương trình đào tạo tuyển sinh Đại học chính quy năm 2026 của Học viện Phụ nữ Việt Nam:\n\n### I. ĐÀO TẠO TẠI HÀ NỘI\n\n| STT | Tên ngành / Chương trình đào tạo | Mã ngành | Chỉ tiêu | Tổ",
+      "categoryMatched": "ug",
+      "feedback": null,
+      "tags": [
+        "ngành đào tạo"
+      ],
+      "documentReferenced": [
+        "THÔNG BÁO TUYỂN SINH ĐHCQ 2026 (1)",
+        "Đề án tuyển sinh năm 2026"
+      ]
     }
-  ]
+  ],
+  "admins": [
+    "tructn@vwa.edu.vn"
+  ],
+  "schoolConfig": {
+    "name": "Học viện Phụ nữ Việt Nam",
+    "shortName": "VWA",
+    "logoUrl": "",
+    "logoIcon": "GraduationCap",
+    "address": "Số 68 Nguyễn Chí Thanh, Phường Láng, Hà Nội",
+    "hotline": "024.3775.1750",
+    "email": "tuyensinh@vwa.edu.vn",
+    "website": "https://tuyensinh.hvpnvn.edu.vn/",
+    "aiRoutingMode": "ai_only",
+    "faqConfidenceThreshold": 45,
+    "defaultModel": "gemini-3.5-flash",
+    "aiMaxTokens": 4000,
+    "enableCache": true
+  }
 }

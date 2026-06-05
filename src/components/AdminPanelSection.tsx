@@ -8,9 +8,9 @@ import {
   FileText, Upload, Plus, Trash2, ToggleLeft, ToggleRight, CheckCircle2, 
   HelpCircle, Eye, Edit, BarChart3, Clock, AlertTriangle, RefreshCw, 
   Tag, Download, FileSpreadsheet, Check, X, BookmarkCheck, ThumbsUp, ThumbsDown,
-  Users, UserPlus, ShieldAlert, KeyRound
+  Users, UserPlus, ShieldAlert, KeyRound, School, Award, BookOpen, GraduationCap, Settings
 } from 'lucide-react';
-import { RecruitmentDocument, FAQ, HistoryItem, RecruitmentStats } from '../types.ts';
+import { RecruitmentDocument, FAQ, HistoryItem, RecruitmentStats, SchoolConfig } from '../types.ts';
 
 interface AdminPanelSectionProps {
   documents: RecruitmentDocument[];
@@ -19,6 +19,7 @@ interface AdminPanelSectionProps {
   stats: RecruitmentStats | null;
   onRefreshAll: () => void;
   currentUser: { email: string; role: string; name: string } | null;
+  schoolConfig: SchoolConfig | null;
 }
 
 export default function AdminPanelSection({ 
@@ -27,10 +28,127 @@ export default function AdminPanelSection({
   history, 
   stats, 
   onRefreshAll,
-  currentUser
+  currentUser,
+  schoolConfig
 }: AdminPanelSectionProps) {
-  // Tabs: 'docs' | 'faqs' | 'history' | 'stats' | 'admins'
-  const [activeTab, setActiveTab] = useState<'docs' | 'faqs' | 'history' | 'stats' | 'admins'>('docs');
+  // Tabs: 'docs' | 'faqs' | 'history' | 'stats' | 'admins' | 'settings'
+  const [activeTab, setActiveTab] = useState<'docs' | 'faqs' | 'history' | 'stats' | 'admins' | 'settings'>('docs');
+  
+  // School Profile config editor states
+  const [cfgName, setCfgName] = useState('');
+  const [cfgShortName, setCfgShortName] = useState('');
+  const [cfgLogoUrl, setCfgLogoUrl] = useState('');
+  const [cfgLogoIcon, setCfgLogoIcon] = useState('GraduationCap');
+  const [cfgAddress, setCfgAddress] = useState('');
+  const [cfgHotline, setCfgHotline] = useState('');
+  const [cfgEmail, setCfgEmail] = useState('');
+  const [cfgWebsite, setCfgWebsite] = useState('');
+
+  // Phân hệ Cấu hình tối ưu chi phí & Định tuyến thông minh
+  const [cfgAiRoutingMode, setCfgAiRoutingMode] = useState<'hybrid' | 'ai_only' | 'faq_only'>('hybrid');
+  const [cfgFaqConfidenceThreshold, setCfgFaqConfidenceThreshold] = useState<number>(40);
+  const [cfgDefaultModel, setCfgDefaultModel] = useState<string>('gemini-3.5-flash');
+  const [cfgAiMaxTokens, setCfgAiMaxTokens] = useState<number>(4000);
+  const [cfgEnableCache, setCfgEnableCache] = useState<boolean>(true);
+  
+  const [cfgSaveLoading, setCfgSaveLoading] = useState(false);
+  const [cfgLogoUploading, setCfgLogoUploading] = useState(false);
+  const [cfgError, setCfgError] = useState('');
+  const [cfgSuccess, setCfgSuccess] = useState('');
+
+  useEffect(() => {
+    if (schoolConfig) {
+      setCfgName(schoolConfig.name || '');
+      setCfgShortName(schoolConfig.shortName || '');
+      setCfgLogoUrl(schoolConfig.logoUrl || '');
+      setCfgLogoIcon(schoolConfig.logoIcon || 'GraduationCap');
+      setCfgAddress(schoolConfig.address || '');
+      setCfgHotline(schoolConfig.hotline || '');
+      setCfgEmail(schoolConfig.email || '');
+      setCfgWebsite(schoolConfig.website || '');
+
+      setCfgAiRoutingMode(schoolConfig.aiRoutingMode || 'hybrid');
+      setCfgFaqConfidenceThreshold(schoolConfig.faqConfidenceThreshold !== undefined ? schoolConfig.faqConfidenceThreshold : 40);
+      setCfgDefaultModel(schoolConfig.defaultModel || 'gemini-3.5-flash');
+      setCfgAiMaxTokens(schoolConfig.aiMaxTokens !== undefined ? schoolConfig.aiMaxTokens : 4000);
+      setCfgEnableCache(schoolConfig.enableCache !== undefined ? schoolConfig.enableCache : true);
+    }
+  }, [schoolConfig]);
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cfgName.trim() || !cfgShortName.trim() || !cfgAddress.trim()) {
+      setCfgError('Cán bộ vui lòng nhập đầy đủ các trường bắt buộc (Tên trường, Tên viết tắt, Địa chỉ)');
+      return;
+    }
+    setCfgSaveLoading(true);
+    setCfgError('');
+    setCfgSuccess('');
+    try {
+      const res = await fetch('/api/school-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: cfgName.trim(),
+          shortName: cfgShortName.trim(),
+          logoUrl: cfgLogoUrl.trim(),
+          logoIcon: cfgLogoIcon,
+          address: cfgAddress.trim(),
+          hotline: cfgHotline.trim(),
+          email: cfgEmail.trim(),
+          website: cfgWebsite.trim(),
+          // Gửi Cost control settings
+          aiRoutingMode: cfgAiRoutingMode,
+          faqConfidenceThreshold: Number(cfgFaqConfidenceThreshold),
+          defaultModel: cfgDefaultModel,
+          aiMaxTokens: Number(cfgAiMaxTokens),
+          enableCache: cfgEnableCache
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setCfgSuccess('Cấu hình và lưu thông tin thương hiệu đơn vị đào tạo thành công!');
+        onRefreshAll();
+      } else {
+        setCfgError(data.message || 'Lỗi khi lưu cấu hình.');
+      }
+    } catch (err: any) {
+      setCfgError('Lỗi kết nối: ' + err.message);
+    } finally {
+      setCfgSaveLoading(false);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCfgLogoUploading(true);
+    setCfgError('');
+    setCfgSuccess('');
+
+    const formData = new FormData();
+    formData.append('logo', file);
+
+    try {
+      const res = await fetch('/api/school-config/logo', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setCfgLogoUrl(data.logoUrl);
+        setCfgSuccess('Tải logo custom biểu trưng thành công!');
+        onRefreshAll();
+      } else {
+        setCfgError(data.message || 'Lỗi tải ảnh logo lên server.');
+      }
+    } catch (err: any) {
+      setCfgError('Lỗi kết nối khi tải ảnh: ' + err.message);
+    } finally {
+      setCfgLogoUploading(false);
+    }
+  };
   
   // Document interaction states
   const [selectedDoc, setSelectedDoc] = useState<RecruitmentDocument | null>(null);
@@ -356,6 +474,7 @@ export default function AdminPanelSection({
           ];
           if (currentUser) {
             tabItems.push({ id: 'admins', label: 'Cấp quyền & Quản lý Cán bộ', count: null });
+            tabItems.push({ id: 'settings', label: 'Cấu hình Đơn vị đào tạo', count: null });
           }
           return tabItems;
         })().map(tab => (
@@ -1161,6 +1280,344 @@ export default function AdminPanelSection({
                       )}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* TAB 6: TRAINING UNIT / SCHOOL PROFILE SETTINGS */}
+      {activeTab === 'settings' && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-slate-100 pb-4 mb-6">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 bg-blue-50 text-blue-700 rounded-xl">
+                  <Settings className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900 uppercase">Cấu hình Đơn vị Đào tạo & Thương hiệu</h2>
+                  <p className="text-xs text-slate-400 font-medium">Thay đổi thông tin nhận diện cơ sở giáo dục, hotline, địa chỉ, website, và logo biểu trưng</p>
+                </div>
+              </div>
+            </div>
+
+            {cfgError && (
+              <div className="p-4 bg-rose-50 text-rose-700 border border-rose-100 rounded-xl text-xs font-semibold mb-5 flex items-start space-x-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{cfgError}</span>
+              </div>
+            )}
+            
+            {cfgSuccess && (
+              <div className="p-4 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl text-xs font-semibold mb-5 flex items-start space-x-2">
+                <Check className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{cfgSuccess}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Profile Config Form */}
+              <form onSubmit={handleSaveSettings} className="lg:col-span-2 space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">Tên Cơ sở đào tạo (Tiếng Việt) <span className="text-rose-500">*</span></label>
+                    <input 
+                      type="text" 
+                      value={cfgName}
+                      onChange={(e) => setCfgName(e.target.value)}
+                      placeholder="Ví dụ: Học viện Phụ nữ Việt Nam"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-slate-800"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">Tên viết tắt (Thương hiệu) <span className="text-rose-500">*</span></label>
+                    <input 
+                      type="text" 
+                      value={cfgShortName}
+                      onChange={(e) => setCfgShortName(e.target.value)}
+                      placeholder="Ví dụ: VWA"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-slate-800"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">Địa chỉ Trụ sở chính / Cơ sở <span className="text-rose-500">*</span></label>
+                  <textarea 
+                    value={cfgAddress}
+                    onChange={(e) => setCfgAddress(e.target.value)}
+                    placeholder="Nhập địa chỉ đầy đủ để hiển thị ở chân trang"
+                    rows={2}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-slate-800"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">Hotline Tư vấn tuyển sinh</label>
+                    <input 
+                      type="text" 
+                      value={cfgHotline}
+                      onChange={(e) => setCfgHotline(e.target.value)}
+                      placeholder="Ví dụ: 024.3775.1750"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-slate-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">Email liên hệ tuyển sinh</label>
+                    <input 
+                      type="email" 
+                      value={cfgEmail}
+                      onChange={(e) => setCfgEmail(e.target.value)}
+                      placeholder="Ví dụ: tuyensinh@vwa.edu.vn"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-slate-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">Website chính quy (URL)</label>
+                    <input 
+                      type="url" 
+                      value={cfgWebsite}
+                      onChange={(e) => setCfgWebsite(e.target.value)}
+                      placeholder="Ví dụ: https://hvpnvn.edu.vn"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                {/* Logo & Symbol Selection */}
+                <div className="border border-slate-150 p-4 rounded-2xl bg-slate-50 space-y-4">
+                  <h4 className="text-xs font-bold text-slate-700 uppercase">Cấu hình biểu tượng & Biểu trưng thương hiệu</h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Chọn Logo Biểu tượng (Nếu không tải ảnh lên)</label>
+                      <select
+                        value={cfgLogoIcon}
+                        onChange={(e) => setCfgLogoIcon(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none text-slate-700 font-semibold focus:border-blue-500"
+                      >
+                        <option value="GraduationCap">🎓 Mũ Cử nhân (Graduation Cap)</option>
+                        <option value="School">🏫 Trường học (School)</option>
+                        <option value="BookOpen">📖 Sách mở (Book Open)</option>
+                        <option value="Award">🏆 Cúp học thuật (Award)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Đường dẫn tệp Logo tùy chỉnh (Tùy chọn)</label>
+                      <input 
+                        type="text" 
+                        value={cfgLogoUrl}
+                        onChange={(e) => setCfgLogoUrl(e.target.value)}
+                        placeholder="Có thể dán link ảnh logo hoặc tải ở bên phải"
+                        className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 text-xs focus:border-blue-500 outline-none text-slate-750"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* PHÂN HỆ QUẢN LÝ ĐỊNH TUYẾN AI & TỐI ƯU CHI PHÍ */}
+                <div className="border border-indigo-100 p-5 rounded-2xl bg-gradient-to-br from-indigo-50/45 to-slate-50/70 space-y-4">
+                  <div className="flex items-center space-x-2 border-b border-indigo-100 pb-2.5">
+                    <div className="p-1.5 bg-indigo-100 text-indigo-700 rounded-lg">
+                      <KeyRound className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-indigo-900 uppercase">Phân hệ Quản lý Định tuyến & Tối ưu chi phí AI</h4>
+                      <p className="text-[10px] text-indigo-600 font-medium">Bổ sung cơ chế giảm thiểu token, định tuyến cục bộ, bộ nhớ đệm và lọc lặp để tiết kiệm tối đa ngân sách vận hành</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {/* Routing Mode */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">Chế độ định tuyến câu hỏi (Query Router)</label>
+                      <select
+                        value={cfgAiRoutingMode}
+                        onChange={(e) => setCfgAiRoutingMode(e.target.value as any)}
+                        className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none text-slate-700 font-semibold focus:border-indigo-500"
+                      >
+                        <option value="hybrid">🔄 Định tuyến kết hợp thông minh (Quét FAQ trước, AI sau - Tiết kiệm Token)</option>
+                        <option value="ai_only">✨ Hoàn toàn bằng AI (Luôn gọi Gemini để trả lời phong phú nhất)</option>
+                        <option value="faq_only">📴 Chỉ dùng Luật & FAQ nội bộ (Offline hoàn toàn - Không phát sinh chi phí API)</option>
+                      </select>
+                      <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                        {cfgAiRoutingMode === 'hybrid' && "💡 Hệ thống sẽ tự động đối chiếu câu hỏi của học sinh với cơ sở dữ liệu câu hỏi thường gặp FAQ. Nếu khớp với độ tương đồng thích hợp, câu hỏi sẽ được giải đáp ngay bằng câu trả lời soạn sẵn, giúp tốc độ phản hồi < 0.1s và tốn 0đ phí API."}
+                        {cfgAiRoutingMode === 'ai_only' && "⚠️ Thích hợp khi muốn chatbot có giọng điệu biến chuyển linh hoạt. Mọi câu hỏi đều gọi trực tiếp lên máy chủ AI của Google."}
+                        {cfgAiRoutingMode === 'faq_only' && "✅ Tránh tuyệt đối hóa đơn AI. Chatbot chỉ tìm kiếm thông tin từ tài liệu PDF/Docx của trường và FAQ cục bộ để sinh phản hồi."}
+                      </p>
+                    </div>
+
+                    {/* FAQ Confidence Threshold - Only shown when hybrid is active */}
+                    {(cfgAiRoutingMode === 'hybrid') && (
+                      <div className="bg-white p-3.5 rounded-xl border border-slate-150 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <label className="block text-[11px] font-bold text-slate-600 uppercase">Ngưỡng khớp FAQ thông minh (Confidence Threshold): <span className="text-indigo-600 font-bold">{cfgFaqConfidenceThreshold}%</span></label>
+                          <span className="text-[10px] px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-bold">{cfgFaqConfidenceThreshold >= 50 ? 'Khắt khe' : cfgFaqConfidenceThreshold >= 30 ? 'Cân bằng' : 'Rộng rãi'}</span>
+                        </div>
+                        <input 
+                          type="range" 
+                          min="15" 
+                          max="85" 
+                          step="5"
+                          value={cfgFaqConfidenceThreshold}
+                          onChange={(e) => setCfgFaqConfidenceThreshold(Number(e.target.value))}
+                          className="w-full accent-indigo-600 cursor-pointer"
+                        />
+                        <p className="text-[10px] text-slate-400 leading-normal">
+                          Độ nhạy khớp từ khóa từ câu hỏi người dùng lên câu hỏi FAQ. Ngưỡng thấp hơn giúp tăng tỉ lệ bỏ cuộc gọi API (tiết kiệm tiền), nhưng ngưỡng quá thấp có thể trả về câu trả lời FAQ chưa hoàn toàn chính xác. Khuyên dùng: <strong className="text-slate-600">35% - 45%</strong>.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                      {/* Select Model */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">Mô hình AI mặc định</label>
+                        <select
+                          value={cfgDefaultModel}
+                          onChange={(e) => setCfgDefaultModel(e.target.value)}
+                          disabled={cfgAiRoutingMode === 'faq_only'}
+                          className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none text-slate-700 font-semibold focus:border-indigo-500 disabled:opacity-50"
+                        >
+                          <option value="gemini-3.5-flash">Gemini 3.5 Flash (Tối ưu phản hồi & Tốc độ)</option>
+                          <option value="gemini-1.5-flash">Gemini 1.5 Flash (Chi phí hợp lý, ổn định)</option>
+                          <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite (Hạn ngạch miễn phí cực lớn)</option>
+                        </select>
+                        <p className="text-[10px] text-slate-400 mt-1">Lựa chọn phiên bản mô hình xử lý khi không có FAQ khớp.</p>
+                      </div>
+
+                      {/* AI Max Tokens */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">Giới hạn số từ AI sinh ra tối đa</label>
+                        <select
+                          value={cfgAiMaxTokens}
+                          onChange={(e) => setCfgAiMaxTokens(Number(e.target.value))}
+                          disabled={cfgAiRoutingMode === 'faq_only'}
+                          className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none text-slate-700 font-semibold focus:border-indigo-500 disabled:opacity-50"
+                        >
+                          <option value={1000}>1000 Tokens (~600 từ - Tiết kiệm chi phí)</option>
+                          <option value={1500}>1500 Tokens (~900 từ - Tiêu chuẩn đầy đủ)</option>
+                          <option value={2000}>2000 Tokens (~1200 từ - Trả lời chi tiết)</option>
+                          <option value={2500}>2500 Tokens (~1500 từ - Tối ưu)</option>
+                          <option value={3000}>3000 Tokens (~1800 từ - Chi tiết nâng cao)</option>
+                          <option value={4000}>4000 Tokens (~2400 từ - Thông tin Đầy Đủ Nhất - Khuyên dùng)</option>
+                          <option value={8000}>8000 Tokens (~4800 từ - Siêu chi tiết chuyên sâu)</option>
+                        </select>
+                        <p className="text-[10px] text-slate-400 mt-1">Giới hạn đầu ra từ AI giúp tiết kiệm chi phí phát sinh theo lượng chữ.</p>
+                      </div>
+                    </div>
+
+                    {/* Enable Fast-Cache */}
+                    <div className="flex items-center justify-between p-3.5 bg-white border border-slate-200 rounded-xl">
+                      <div className="space-y-0.5 max-w-[80%]">
+                        <label className="block text-xs font-bold text-slate-700 uppercase">Kích hoạt bộ nhớ đệm thông minh (Response Fast Cache)</label>
+                        <p className="text-[10px] text-slate-400 leading-normal">
+                          Khi học sinh hỏi các câu hỏi hoàn toàn trùng khớp hoặc tương đương trong vòng 12 tiếng, hệ thống sẽ hồi đáp ngay nội dung từ cache lần trước. Tiêu hao <strong className="text-emerald-600 font-semibold">0đ Token</strong> và tải lập tức.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCfgEnableCache(!cfgEnableCache)}
+                        className={`p-1 rounded-xl transition-all ${cfgEnableCache ? 'text-indigo-600' : 'text-slate-300'}`}
+                      >
+                        {cfgEnableCache ? (
+                          <ToggleRight className="h-9 w-9 text-indigo-600 cursor-pointer" />
+                        ) : (
+                          <ToggleLeft className="h-9 w-9 text-slate-400 cursor-pointer" />
+                        )}
+                      </button>
+                    </div>
+
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    disabled={cfgSaveLoading}
+                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-6 py-3.5 rounded-2xl cursor-pointer shadow-md hover:shadow-blue-550/20 transition-all flex items-center space-x-2 disabled:opacity-50"
+                  >
+                    {cfgSaveLoading && <LoaderIcon />}
+                    <span>Lưu cấu hình hệ thống</span>
+                  </button>
+                </div>
+              </form>
+
+              {/* Logo Upload Box & Preview Card */}
+              <div className="space-y-5">
+                <div className="bg-slate-50 border border-slate-150 rounded-2xl p-5 text-center flex flex-col items-center">
+                  <h4 className="text-xs font-bold text-slate-700 uppercase mb-4 w-full text-left">Biểu trưng & Preview Logo</h4>
+                  
+                  <div className="w-24 h-24 bg-white border border-slate-150 rounded-2xl flex items-center justify-center p-2 shadow-sm mb-4">
+                    {cfgLogoUrl ? (
+                      <img 
+                        src={cfgLogoUrl} 
+                        alt="Logo Preview" 
+                        className="w-full h-full object-contain rounded-xl"
+                        onError={(e) => {
+                          // Fallback to error
+                          (e.target as any).src = 'https://placehold.co/96x96?text=Invalid';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-14 h-14 bg-blue-600 rounded-xl flex items-center justify-center text-white">
+                        {cfgLogoIcon === 'School' && <School className="h-8 w-8" />}
+                        {cfgLogoIcon === 'BookOpen' && <BookOpen className="h-8 w-8" />}
+                        {cfgLogoIcon === 'Award' && <Award className="h-8 w-8" />}
+                        {cfgLogoIcon === 'GraduationCap' && <GraduationCap className="h-8 w-8" />}
+                      </div>
+                    )}
+                  </div>
+
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Thẩm định Hiện tại</span>
+                  <div className="bg-white border border-slate-200 rounded-xl p-3 w-full text-left text-xs font-semibold text-slate-700 space-y-1">
+                    <div className="text-[10px] text-slate-400">Tên hiển thị:</div>
+                    <div className="font-bold text-blue-900 border-b border-slate-50 pb-1">{cfgName || 'Chưa nhập'}</div>
+                    <div className="text-[10px] text-slate-400 mt-1">Viết tắt:</div>
+                    <div className="font-bold text-slate-800">{cfgShortName || 'Chưa nhập'}</div>
+                  </div>
+                </div>
+
+                {/* Upload New Logo Widget */}
+                <div className="bg-white border text-center border-slate-200 rounded-2xl p-5 space-y-3.5 relative">
+                  <div className="h-10 w-10 bg-pink-50 rounded-xl flex items-center justify-center text-pink-600 mx-auto border border-pink-100">
+                    <Upload className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h5 className="text-[11px] font-bold text-slate-800 uppercase">Tải tệp tin Logo mới</h5>
+                    <p className="text-[10px] text-slate-400 leading-normal mt-0.5">Dành cho tập tin .png, .jpg hoặc .svg. Dung lượng cho phép tối đa 1.5MB.</p>
+                  </div>
+                  
+                  <div className="relative border-2 border-dashed border-slate-200 hover:border-pink-500 rounded-2xl p-6 transition-all bg-slate-50/50 cursor-pointer">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleLogoUpload}
+                      disabled={cfgLogoUploading}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                    <div className="text-xs text-slate-500 font-medium">Click chọn hoặc thả logo của bạn vào đây</div>
+                  </div>
+
+                  {cfgLogoUploading && (
+                    <div className="absolute inset-0 bg-white/70 flex items-center justify-center backdrop-blur-xs font-bold text-slate-700 text-xs rounded-2xl">
+                      <div className="flex items-center space-x-2 bg-slate-800 text-white px-3 py-1.5 rounded-lg">
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        <span>Đang xử lý tải lên...</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

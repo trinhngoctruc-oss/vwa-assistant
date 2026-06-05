@@ -54,3 +54,20 @@ export interface Message {
   sourceDocs?: string[];
   suggestedQuestions?: string[];
 }
+
+export interface SchoolConfig {
+  name: string;
+  shortName: string;
+  logoUrl?: string;
+  logoIcon?: string;
+  address: string;
+  hotline: string;
+  email: string;
+  website: string;
+  // Phân hệ Quản lý định tuyến AI & Tối ưu chi phí
+  aiRoutingMode?: 'hybrid' | 'ai_only' | 'faq_only';
+  faqConfidenceThreshold?: number; // range 0 to 100
+  defaultModel?: string; // 'gemini-3.5-flash', 'gemini-1.5-flash', etc.
+  aiMaxTokens?: number; // max output tokens
+  enableCache?: boolean; // toggle response memory caching
+}

@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GraduationCap, Settings, Phone, MessageSquare, LogOut } from 'lucide-react';
+import { GraduationCap, Settings, Phone, MessageSquare, LogOut, School, BookOpen, Award } from 'lucide-react';
+import { SchoolConfig } from '../types.ts';
 
 interface HeaderProps {
   isAdminMode: boolean;
@@ -11,6 +12,7 @@ interface HeaderProps {
   onlineStatus: 'online' | 'offline';
   currentUser: { email: string; role: string; name: string } | null;
   onLogout: () => void;
+  schoolConfig: SchoolConfig | null;
 }
 
 export default function Header({ 
@@ -18,28 +20,47 @@ export default function Header({
   setIsAdminMode, 
   onlineStatus,
   currentUser,
-  onLogout 
+  onLogout,
+  schoolConfig
 }: HeaderProps) {
+  const renderLogoIcon = (iconName?: string) => {
+    switch (iconName) {
+      case 'School': return <School className="h-6 w-6 text-white" />;
+      case 'BookOpen': return <BookOpen className="h-6 w-6 text-white" />;
+      case 'Award': return <Award className="h-6 w-6 text-white" />;
+      default: return <GraduationCap className="h-6 w-6 text-white" />;
+    }
+  };
+
   return (
     <header className="bg-white/95 backdrop-blur-xl text-slate-800 border-b border-blue-100 sticky top-0 z-50 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Logo & Academy Brand */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-[0_2px_12px_rgba(37,99,235,0.4)] text-white shrink-0">
-              <GraduationCap className="h-6 w-6 text-white" />
-            </div>
+            {schoolConfig?.logoUrl ? (
+              <img 
+                src={schoolConfig.logoUrl} 
+                alt={schoolConfig.name} 
+                className="w-10 h-10 object-contain rounded-lg shadow-sm shrink-0" 
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-[0_2px_12px_rgba(37,99,235,0.4)] text-white shrink-0">
+                {renderLogoIcon(schoolConfig?.logoIcon)}
+              </div>
+            )}
             <div>
               <div className="flex items-center space-x-2">
                 <span className="font-display font-bold text-sm sm:text-base leading-tight uppercase tracking-tight text-blue-900">
-                  Học viện Phụ nữ Việt Nam
+                  {schoolConfig?.name || "Học viện Phụ nữ Việt Nam"}
                 </span>
                 <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded uppercase tracking-wider border border-blue-200">
-                  VWA
+                  {schoolConfig?.shortName || "VWA"}
                 </span>
               </div>
               <p className="text-[10px] text-blue-600 uppercase tracking-widest font-sans hidden sm:block font-semibold">
-                Vietnam Women's Academy • Admissions AI Panel
+                {schoolConfig?.name || "Vietnam Women's Academy"} • Admissions AI Panel
               </p>
             </div>
           </div>
@@ -51,7 +72,7 @@ export default function Header({
               <Phone className="h-3.5 w-3.5 text-blue-600 animate-pulse" />
               <div className="text-left font-sans">
                 <span className="text-slate-500 block text-[9px] uppercase font-bold tracking-wide">Hotline Tư vấn</span>
-                <span className="font-bold text-blue-700">024.3775.1750</span>
+                <span className="font-bold text-blue-700">{schoolConfig?.hotline || "024.3775.1750"}</span>
               </div>
             </div>
 

@@ -11,19 +11,20 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Message, FAQ } from '../types.ts';
+import { Message, FAQ, SchoolConfig } from '../types.ts';
 
 interface UserChatSectionProps {
   faqs: FAQ[];
   onRefreshStats: () => void;
+  schoolConfig: SchoolConfig | null;
 }
 
-export default function UserChatSection({ faqs, onRefreshStats }: UserChatSectionProps) {
+export default function UserChatSection({ faqs, onRefreshStats, schoolConfig }: UserChatSectionProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
       sender: 'bot',
-      text: `### Chào mừng quý phụ huynh, thí sinh và học viên! 👋 \n\nTôi là **VWA-Admissions-AI** - Trợ lý Tuyển sinh Thông minh của **Học viện Phụ nữ Việt Nam**.\n\nHôm nay, bạn quan tâm đến hệ đào tạo nào? Hãy chọn hệ để tôi chuẩn hóa dữ liệu tư vấn tốt nhất cho bạn nhé!`,
+      text: `### Chào mừng quý phụ huynh, thí sinh và học viên! 👋 \n\nTôi là **VWA Assistant** - Trợ lý Tuyển sinh Thông minh của **Học viện Phụ nữ Việt Nam**.\n\nHôm nay, bạn quan tâm nội dung gì về tuyển sinh của Học viện, bạn hãy hỏi tôi nhé,  tôi rất vui vì được hỗ trợ bạn`,
       timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
       category: 'general',
       suggestedQuestions: [
@@ -33,6 +34,32 @@ export default function UserChatSection({ faqs, onRefreshStats }: UserChatSectio
       ]
     }
   ]);
+
+  // Synchronize dynamic school config changes to greeting message
+  useEffect(() => {
+    if (schoolConfig) {
+      setMessages(prev => {
+        return prev.map(msg => {
+          if (msg.id === 'welcome') {
+            const shortName = schoolConfig.shortName || "VWA";
+            const fullName = schoolConfig.name || "Học viện Phụ nữ Việt Nam";
+            const assistantName = shortName === "VWA" ? "VWA Assistant" : `${shortName} Assistant`;
+            return {
+              ...msg,
+              text: `### Chào mừng quý phụ huynh, thí sinh và học viên! 👋 \n\nTôi là **${assistantName}** - Trợ lý Tuyển sinh Thông minh của **${fullName}**.\n\nHôm nay, bạn quan tâm nội dung gì về tuyển sinh của Học viện, bạn hãy hỏi tôi nhé,  tôi rất vui vì được hỗ trợ bạn`,
+              suggestedQuestions: [
+                `🏫 Giới thiệu tổng quan về ${fullName}?`,
+                '🎓 Các ngành tuyển sinh Đại học chính quy năm nay?',
+                '📚 Điều kiện và hồ sơ tuyển sinh Thạc sĩ?'
+              ]
+            };
+          }
+          return msg;
+        });
+      });
+    }
+  }, [schoolConfig]);
+
   const [inputMessage, setInputMessage] = useState('');
   const [activeCategory, setActiveCategory] = useState<'ug' | 'pg' | 'general' | 'all'>('all');
   const [responseLength, setResponseLength] = useState<'short' | 'detailed'>('detailed');
@@ -73,12 +100,13 @@ export default function UserChatSection({ faqs, onRefreshStats }: UserChatSectio
         default: query = topic;
       }
     } else {
+      const schoolName = schoolConfig?.name || 'Học viện Phụ nữ Việt Nam';
       switch (topic) {
-        case 'ngành': query = 'Tổng hợp các ngành đào tạo Đại học và Thạc sĩ tại Học viện Phụ nữ Việt Nam?'; break;
-        case 'học phí': query = 'Bảng học phí đại học và thạc sĩ tại trường như thế nào?'; break;
-        case 'phương thức': query = 'Các phương thức xét tuyển mới nhất của Học viện Phụ nữ Việt Nam?'; break;
-        case 'hồ sơ': query = 'Hồ sơ nộp xét tuyển của trường gồm những gì?'; break;
-        case 'liên hệ': query = 'Địa chỉ Học viện Phụ nữ Việt Nam và hotline liên hệ tuyển sinh?'; break;
+        case 'ngành': query = `Tổng hợp các ngành đào tạo Đại học và Thạc sĩ tại ${schoolName}?`; break;
+        case 'học phí': query = `Bảng học phí đại học và thạc sĩ tại trường như thế nào?`; break;
+        case 'phương thức': query = `Các phương thức xét tuyển mới nhất của ${schoolName}?`; break;
+        case 'hồ sơ': query = `Hồ sơ nộp xét tuyển của trường gồm những gì?`; break;
+        case 'liên hệ': query = `Địa chỉ ${schoolName} và hotline liên hệ tuyển sinh?`; break;
         default: query = topic;
       }
     }
@@ -188,10 +216,11 @@ export default function UserChatSection({ faqs, onRefreshStats }: UserChatSectio
     setFormSubmitted(true);
     setTimeout(() => {
       // Add a virtual messages showing confirmation
+      const schoolName = schoolConfig?.name || "Học viện Phụ nữ Việt Nam";
       const confirmationMsg: Message = {
         id: 'contact-confirm-' + Date.now(),
         sender: 'bot',
-        text: `### 🎉 Đã chuyển tiếp thành công tới Cán bộ tuyển sinh!\n\nThông tin của em đã được gửi trực tiếp đến Ban tuyển sinh **Học viện Phụ nữ Việt Nam**.\n\n- **Học viên/Thí sinh:** ${formData.name}\n- **Số điện thoại:** ${formData.phone}\n- **Nguyện vọng tìm hiểu:** Hỗ trợ tư vấn ${formData.level === 'ug' ? 'Đại học Chính quy' : 'Thạc sĩ - Sau đại học'}\n\nCán bộ phòng đào tạo và giảng viên chuyên môn sẽ gọi điện kết nối hỗ trợ trực tiếp trực tuyến qua Zalo hoặc điện thoại cho em hoặc phụ huynh trong vòng tối đa **4 giờ làm việc** sắp tới. Chúc em vững tin và đạt kết quả cao!`,
+        text: `### 🎉 Đã chuyển tiếp thành công tới Cán bộ tuyển sinh!\n\nThông tin của em đã được gửi trực tiếp đến Ban tuyển sinh **${schoolName}**.\n\n- **Học viên/Thí sinh:** ${formData.name}\n- **Số điện thoại:** ${formData.phone}\n- **Nguyện vọng tìm hiểu:** Hỗ trợ tư vấn ${formData.level === 'ug' ? 'Đại học Chính quy' : 'Thạc sĩ - Sau đại học'}\n\nCán bộ phòng đào tạo và giảng viên chuyên môn sẽ gọi điện kết nối hỗ trợ trực tiếp trực tuyến qua Zalo hoặc điện thoại cho em hoặc phụ huynh trong vòng tối đa **4 giờ làm việc** sắp tới. Chúc em vững tin và đạt kết quả cao!`,
         timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
       };
       setMessages(prev => [...prev, confirmationMsg]);
@@ -237,10 +266,10 @@ export default function UserChatSection({ faqs, onRefreshStats }: UserChatSectio
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto h-[calc(100vh-80px)]">
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto h-[calc(100vh-130px)] lg:h-[calc(100vh-175px)] min-h-[580px] lg:min-h-[640px]">
       
-      {/* LEFT COLUMN: GUIDELINES & SELECTION SHORTCUTS */}
-      <div className="lg:col-span-1 flex flex-col space-y-4">
+      {/* LEFT COLUMN: GUIDELINES & SELECTION SHORTCUTS - Hidden on Mobile, Premium Sidebar on Desktop */}
+      <div className="hidden lg:flex lg:col-span-1 flex-col space-y-4">
         
         {/* Category selector */}
         <div className="bg-white border border-blue-100 p-4 rounded-2xl shadow-[0_4px_20px_rgba(37,99,235,0.03)]">
@@ -285,30 +314,7 @@ export default function UserChatSection({ faqs, onRefreshStats }: UserChatSectio
           </div>
         </div>
 
-        {/* Quick topic buttons dashboard */}
-        <div className="bg-white border border-blue-100 p-4 rounded-2xl shadow-[0_4px_20px_rgba(37,99,235,0.03)]">
-          <h2 className="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2.5 flex items-center space-x-1.5">
-            <Sparkles className="h-3.5 w-3.5 text-pink-500" />
-            <span>Nút Hỏi Nhanh</span>
-          </h2>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { label: 'Ngành đào tạo', id: 'ngành' },
-              { label: 'Học phí năm nay', id: 'học phí' },
-              { label: 'Hồ sơ chuẩn bị', id: 'hồ sơ' },
-              { label: 'Xét tuyển học bạ', id: 'phương thức' },
-              { label: 'Thông tin liên hệ', id: 'liên hệ' }
-            ].map((btn, index) => (
-              <button
-                key={index}
-                onClick={() => handleQuickSearch(btn.id)}
-                className="py-2 px-2.5 bg-blue-50/50 hover:bg-pink-50 border border-blue-100 text-blue-700 hover:text-pink-600 hover:border-pink-200 rounded-xl text-xs font-semibold text-center transition-all hover:scale-103 cursor-pointer p-2 h-16 flex items-center justify-center content-center leading-tight shadow-sm"
-              >
-                {btn.label}
-              </button>
-            ))}
-          </div>
-        </div>
+
 
         {/* AI Config Options */}
         <div className="bg-white border border-blue-100 p-4 rounded-2xl shadow-[0_4px_20px_rgba(37,99,235,0.03)]">
@@ -349,34 +355,93 @@ export default function UserChatSection({ faqs, onRefreshStats }: UserChatSectio
           <span>Gặp Cán Bộ Hỗ Trợ Trực Tiếp</span>
         </button>
 
-
-
       </div>
 
       {/* CENTER & RIGHT COLUMN (CONJOINED): ACTIVE CHAT CONSOLE */}
       <div className="lg:col-span-3 flex flex-col bg-white rounded-3xl shadow-[0_8px_30px_rgba(37,99,235,0.03)] border border-blue-105 overflow-hidden h-full">
         
         {/* Chat Console Header */}
-        <div className="bg-gradient-to-r from-[#003366] via-blue-800 to-purple-900 p-4 text-white flex items-center justify-between border-b border-blue-200">
-          <div className="flex items-center space-x-2">
-            <div className="relative">
+        <div className="bg-gradient-to-r from-[#003366] via-blue-800 to-purple-900 p-3 sm:p-4 text-white flex items-center justify-between border-b border-blue-200 shrink-0">
+          <div className="flex items-center space-x-2 min-w-0">
+            <div className="relative shrink-0">
               <div className="bg-white/10 p-2 rounded-xl flex items-center justify-center">
                 <Sparkles className="h-4 w-4 text-pink-300 animate-pulse" />
               </div>
               <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-400 border border-slate-950"></span>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center space-x-2">
-                <h3 className="font-display font-bold text-sm tracking-wide">VWA Admissions AI Assistant</h3>
-                <span className="text-[9px] bg-pink-500/20 text-pink-200 font-bold px-2 py-0.5 rounded uppercase border border-pink-500/30">Học Viện Thân Thiện</span>
+                <h3 className="font-display font-bold text-xs sm:text-sm tracking-wide truncate">VWA Assistant</h3>
               </div>
-              <p className="text-[11px] text-blue-100">
-                {activeCategory === 'ug' ? 'Đang lọc dữ liệu xét tuyển Đại học đợt hot' : activeCategory === 'pg' ? 'Đang khai thác tri thức tuyển sinh Cao học' : 'Hệ thống hỗ trợ thí sinh trực tuyến 24/7'}
+              <p className="text-[10px] sm:text-[11px] text-blue-101 truncate opacity-90">
+                {activeCategory === 'ug' ? 'Đang lọc dữ liệu xét tuyển Đại học' : activeCategory === 'pg' ? 'Đang lọc tuyển sinh Cao học' : 'Hệ thống hỗ trợ thí sinh trực tuyến 24/7'}
               </p>
             </div>
           </div>
 
+          {/* Quick Actions for Mobile/Tablet in Header */}
+          <div className="flex items-center space-x-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setResponseLength(prev => prev === 'short' ? 'detailed' : 'short')}
+              className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer flex items-center space-x-1 ${
+                responseLength === 'detailed'
+                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-pink-500 shadow-sm'
+                  : 'bg-white/10 text-blue-100 border-white/20'
+              }`}
+              title={responseLength === 'detailed' ? 'Chọn trả lời ngắn gọn' : 'Chọn trả lời chi tiết'}
+            >
+              <span>{responseLength === 'detailed' ? '✨ Chi tiết' : '⚡ Ngắn'}</span>
+            </button>
 
+            <button
+              type="button"
+              onClick={() => setShowCounselorForm(true)}
+              className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg flex items-center space-x-1 border-none cursor-pointer transition-all active:scale-95 shadow-sm"
+              title="Đăng ký hỗ trợ 1-1 từ cán bộ"
+            >
+              <UserPlus className="h-3 w-3" />
+              <span className="hidden xs:inline">Hỗ trợ 1-1</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Filter Category Tabs */}
+        <div className="flex lg:hidden items-center justify-start py-2 px-3 bg-slate-50 border-b border-blue-100 overflow-x-auto scrollbar-none gap-2 shrink-0">
+          <span className="text-[10px] uppercase font-bold text-slate-400 pl-1 shrink-0">Phân hệ:</span>
+          <button
+            type="button"
+            onClick={() => setActiveCategory('all')}
+            className={`px-3 py-1 text-[11px] font-bold rounded-full transition-all cursor-pointer whitespace-nowrap ${
+              activeCategory === 'all'
+                ? 'bg-[#003366] text-white'
+                : 'bg-white text-slate-600 border border-slate-200'
+            }`}
+          >
+            🌐 Chung
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveCategory('ug')}
+            className={`px-3 py-1 text-[11px] font-bold rounded-full transition-all cursor-pointer whitespace-nowrap ${
+              activeCategory === 'ug'
+                ? 'bg-gradient-to-r from-blue-600 to-pink-500 text-white shadow-xs'
+                : 'bg-white text-slate-600 border border-slate-200'
+            }`}
+          >
+            🎓 Đại học
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveCategory('pg')}
+            className={`px-3 py-1 text-[11px] font-bold rounded-full transition-all cursor-pointer whitespace-nowrap ${
+              activeCategory === 'pg'
+                ? 'bg-slate-800 text-white'
+                : 'bg-white text-slate-600 border border-slate-200'
+            }`}
+          >
+            📚 Cao học
+          </button>
         </div>
 
         {/* Chat Display Pane */}
@@ -402,7 +467,7 @@ export default function UserChatSection({ faqs, onRefreshStats }: UserChatSectio
                 {/* Meta details */}
                 <div className="flex items-center justify-between space-x-4 mb-2 text-[10px] opacity-75">
                   <span className={`font-bold uppercase tracking-wide ${msg.sender === 'user' ? 'text-pink-600' : 'text-blue-700'}`}>
-                    {msg.sender === 'user' ? 'Thí sinh / Phụ huynh' : 'Ban Tuyển sinh AI'}
+                    {msg.sender === 'user' ? 'Thí sinh / Phụ huynh' : 'Trợ lý Tuyển sinh AI'}
                   </span>
                   <span className="text-slate-400 font-medium">{msg.timestamp}</span>
                 </div>
@@ -477,7 +542,7 @@ export default function UserChatSection({ faqs, onRefreshStats }: UserChatSectio
                   <div className="h-2.5 w-2.5 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                 </div>
                 <p className="text-[11px] text-slate-400 italic">
-                  Thuật toán RAG đang rà soát chính xác dữ liệu gốc học vụ...
+                  Trợ lý tuyển sinh đang tìm kiếm thông tin, xin vui lòng chờ trong giây lát...
                 </p>
               </div>
             </div>
@@ -509,7 +574,32 @@ export default function UserChatSection({ faqs, onRefreshStats }: UserChatSectio
         </div>
 
         {/* Form to ask questions */}
-        <div className="p-4 border-t border-blue-100 bg-white shadow-[0_-4px_25px_rgba(0,0,0,0.02)]">
+        <div className="p-3 sm:p-4 border-t border-blue-100 bg-white shadow-[0_-4px_25px_rgba(0,0,0,0.02)] shrink-0">
+          
+          {/* Quick topic slider (Essential shortcut on Mobile, awesome on Desktop) */}
+          <div className="flex items-center space-x-2 pb-2 overflow-x-auto scrollbar-none">
+            <Sparkles className="h-3.5 w-3.5 text-pink-500 shrink-0 animate-pulse" />
+            <span className="text-[10px] uppercase font-bold text-slate-400 shrink-0">Hỏi nhanh:</span>
+            <div className="flex space-x-1.5 overflow-x-auto scrollbar-none py-0.5">
+              {[
+                { label: '🏫 Ngành đào tạo', id: 'ngành' },
+                { label: '💰 Học phí năm nay', id: 'học phí' },
+                { label: '📑 Hồ sơ xét tuyển', id: 'hồ sơ' },
+                { label: '✍️ Xét tuyển học bạ', id: 'phương thức' },
+                { label: '📞 Liên hệ hotline', id: 'liên hệ' }
+              ].map((btn, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handleQuickSearch(btn.id)}
+                  className="whitespace-nowrap px-3 py-1 bg-blue-50/50 hover:bg-pink-50 border border-blue-100/60 hover:border-pink-200 text-[11px] text-blue-700 hover:text-pink-600 rounded-full transition-all font-semibold shadow-2xs cursor-pointer inline-flex items-center"
+                >
+                  {btn.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <form onSubmit={handleFormSubmit} className="flex space-x-2">
             <input
               type="text"
@@ -521,7 +611,7 @@ export default function UserChatSection({ faqs, onRefreshStats }: UserChatSectio
                   ? 'Hỏi chatbot tuyển sinh Đại học (ví dụ: học phí, tổ hợp, ngành học...)...'
                   : activeCategory === 'pg'
                   ? 'Hỏi chatbot tuyển sinh Thạc sĩ / Tiến sĩ (ví dụ: văn bằng, chứng chỉ B1, học phí...)...'
-                  : 'Nhập câu hỏi học vụ, nguyện vọng của bạn để AI tư vấn nợ nộp học bạ...'
+                  : 'Bạn cần tư vấn nội dung gì, hãy gõ nội dung câu hỏi vào đây...'
               }
               className="flex-1 text-sm bg-slate-50 hover:bg-white border border-blue-150 rounded-2xl px-4 py-3.5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-500 text-slate-800 placeholder:text-slate-400 font-medium transition-all shadow-inner"
             />
@@ -538,12 +628,12 @@ export default function UserChatSection({ faqs, onRefreshStats }: UserChatSectio
           {/* Quick instructions indicator */}
           <div className="mt-2.5 flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2">
             <div className="font-medium text-slate-400">
-              💡 Lưu ý: Hệ thống tiếp nhận hồ sơ trực tuyến từ 15/04/2026. Chúc các em nỗ lực đạt ước mơ của mình!
+              💡Hệ thống Trợ lý AI VWA. Chúc các em nỗ lực đạt ước mơ của mình!
             </div>
             <div className="flex items-center space-x-1">
               <Globe className="h-3 w-3 text-blue-500" />
-              <a href="https://hvpnvn.edu.vn" target="_blank" rel="noreferrer" className="hover:underline hover:text-pink-600 font-bold text-blue-600 transition-colors">
-                Trang tuyển sinh Học viện Phụ nữ Việt Nam
+              <a href={schoolConfig?.website || "https://hvpnvn.edu.vn"} target="_blank" rel="noreferrer" className="hover:underline hover:text-pink-600 font-bold text-blue-600 transition-colors">
+                Trang tuyển sinh {schoolConfig?.name || "Học viện Phụ nữ Việt Nam"}
               </a>
             </div>
           </div>

@@ -41,3 +41,12 @@
   backdrop-filter: blur(12px);
   border: 1px solid rgba(0, 51, 102, 0.08);
 }
+
+/* Hide scrollbar utility */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}

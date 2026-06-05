@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import Header from './components/Header.tsx';
 import UserChatSection from './components/UserChatSection.tsx';
 import AdminPanelSection from './components/AdminPanelSection.tsx';
-import { RecruitmentDocument, FAQ, HistoryItem, RecruitmentStats } from './types.ts';
+import { RecruitmentDocument, FAQ, HistoryItem, RecruitmentStats, SchoolConfig } from './types.ts';
 import { Shield, Sparkles, BookOpen, UserCheck, Check } from 'lucide-react';
 
 export default function App() {
@@ -27,31 +27,50 @@ export default function App() {
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [stats, setStats] = useState<RecruitmentStats | null>(null);
+  const [schoolConfig, setSchoolConfig] = useState<SchoolConfig | null>(null);
   const [onlineStatus, setOnlineStatus] = useState<'online' | 'offline'>('online');
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
 
   // Sync data from Express API
   const fetchAllData = async () => {
     try {
-      const [docsRes, faqsRes, historyRes, statsRes] = await Promise.all([
+      const [docsRes, faqsRes, historyRes, statsRes, configRes] = await Promise.all([
         fetch('/api/documents'),
         fetch('/api/faqs'),
         fetch('/api/history'),
-        fetch('/api/stats')
+        fetch('/api/stats'),
+        fetch('/api/school-config')
       ]);
 
-      if (docsRes.ok && faqsRes.ok && historyRes.ok && statsRes.ok) {
-        const [docsData, faqsData, historyData, statsData] = await Promise.all([
+      const isJsonRes = (res: Response) => {
+        const contentType = res.headers.get('content-type');
+        return contentType && contentType.includes('application/json');
+      };
+
+      if (docsRes.ok && faqsRes.ok && historyRes.ok && statsRes.ok && configRes.ok) {
+        if (
+          !isJsonRes(docsRes) || 
+          !isJsonRes(faqsRes) || 
+          !isJsonRes(historyRes) || 
+          !isJsonRes(statsRes) || 
+          !isJsonRes(configRes)
+        ) {
+          throw new Error('Một hoặc nhiều phản hồi API từ máy chủ không thuộc định dạng JSON. Có thể máy chủ đang cài đặt khởi động.');
+        }
+
+        const [docsData, faqsData, historyData, statsData, configData] = await Promise.all([
           docsRes.json(),
           faqsRes.json(),
           historyRes.json(),
-          statsRes.json()
+          statsRes.json(),
+          configRes.json()
         ]);
 
         setDocuments(docsData);
         setFaqs(faqsData);
         setHistory(historyData);
         setStats(statsData);
+        setSchoolConfig(configData);
         setOnlineStatus('online');
       } else {
         setOnlineStatus('offline');
@@ -149,6 +168,7 @@ export default function App() {
         onlineStatus={onlineStatus} 
         currentUser={currentUser}
         onLogout={handleLogout}
+        schoolConfig={schoolConfig}
       />
 
       {/* Main interactive page content */}
@@ -161,9 +181,9 @@ export default function App() {
               </div>
               <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full bg-blue-500 border-2 border-[#f3f7fa] animate-ping"></span>
             </div>
-            <div className="text-center">
+            <div className="text-center px-4">
               <h4 className="font-display font-bold text-sm text-blue-700 uppercase tracking-widest">Đang khởi tạo Hệ thống Tuyển sinh AI...</h4>
-              <p className="text-xs text-slate-400 mt-1.5 font-medium">Bản quyền thuộc về Học viện Phụ nữ Việt Nam © 2026</p>
+              <p className="text-xs text-slate-400 mt-1.5 font-medium">Bản quyền thuộc về {schoolConfig?.name || "Học viện Phụ nữ Việt Nam"} © 2026</p>
             </div>
           </div>
         ) : (
@@ -176,19 +196,8 @@ export default function App() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.25, ease: 'easeOut' }}
               >
-                {/* Visual Intro Banner */}
-                <div className="bg-white border-b border-blue-100 py-6 shadow-sm">
-                  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                    <div>
-                      <h2 className="font-display font-extrabold text-lg md:text-xl text-[#003366] mt-1.5">
-                        Trợ lý Tuyển sinh thông minh - Học viện Phụ nữ Việt Nam
-                      </h2>
-                    </div>
-                  </div>
-                </div>
-
                 {/* User Portal */}
-                <UserChatSection faqs={faqs} onRefreshStats={fetchAllData} />
+                <UserChatSection faqs={faqs} onRefreshStats={fetchAllData} schoolConfig={schoolConfig} />
               </motion.div>
             ) : (
               <motion.div
@@ -207,6 +216,7 @@ export default function App() {
                     stats={stats} 
                     onRefreshAll={fetchAllData} 
                     currentUser={currentUser}
+                    schoolConfig={schoolConfig}
                   />
                 ) : (
                   /* Google OAuth Authenticator Request Screen */
@@ -218,7 +228,7 @@ export default function App() {
                       
                       <h2 className="text-lg font-bold text-slate-900 uppercase tracking-tight mb-2">Cổng Xác thực Cán bộ</h2>
                       <p className="text-xs text-slate-500 leading-relaxed max-w-[320px] mx-auto mb-6">
-                        Yêu cầu xác nhận nhận diện cá nhân của hệ thống Học viện Phụ nữ Việt Nam để quản trị tri thức.
+                        Yêu cầu xác nhận nhận diện cá nhân của hệ thống {schoolConfig?.name || "Học viện Phụ nữ Việt Nam"} để quản trị tri thức.
                       </p>
 
                       {/* Display domain authentication error banners */}
@@ -231,7 +241,7 @@ export default function App() {
                       <div className="space-y-3.5 mb-8 text-left bg-slate-50 p-4 rounded-2xl border border-slate-150 text-[11.5px] leading-relaxed text-slate-600">
                         <div className="flex items-start space-x-2">
                           <Check className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-                          <span>Học liệu, quyết định tuyển sinh & nghị định của học viện</span>
+                          <span>Học liệu, quyết định tuyển sinh & nghị định của cơ sở đào tạo</span>
                         </div>
                         <div className="flex items-start space-x-2">
                           <Check className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
@@ -257,7 +267,7 @@ export default function App() {
                       </button>
 
                       <p className="text-[10px] text-slate-400 mt-5 font-semibold leading-relaxed">
-                        Chỉ các tài khoản thuộc tổ chức kết thúc bằng đuôi <strong className="text-blue-600 font-bold">@vwa.edu.vn</strong> mới được quyền tiếp cận cơ sở dữ liệu.
+                        Chỉ các tài khoản được ủy quyền mới được quyền tiếp cận cơ sở dữ liệu.
                       </p>
                     </div>
                   </div>
@@ -272,11 +282,11 @@ export default function App() {
       <footer className="bg-white text-slate-500 py-6 border-t border-blue-100 text-xs shadow-inner">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
-            <p className="font-bold text-slate-800">HỌC VIỆN PHỤ NỮ VIỆT NAM (VIETNAM WOMEN'S ACADEMY)</p>
-            <p className="text-slate-400 mt-0.5 font-medium font-sans">Trụ sở chính: Số 68 Nguyễn Chí Thanh, Phường Láng, Hà Nội</p>
+            <p className="font-bold text-slate-800 uppercase">{schoolConfig?.name || "HỌC VIỆN PHỤ NỮ VIỆT NAM (VIETNAM WOMEN'S ACADEMY)"}</p>
+            <p className="text-slate-400 mt-0.5 font-medium font-sans">{schoolConfig?.address ? `Địa chỉ: ${schoolConfig.address}` : "Trụ sở chính: Số 68 Nguyễn Chí Thanh, Phường Láng, Hà Nội"}</p>
           </div>
           <p className="text-[11px] text-slate-400 font-medium">
-            AI-Engine powered by Gemini 3.5 Flash • © 2026 Bản quyền thuộc về Học viện Phụ nữ Việt Nam.
+            AI-Engine powered by Gemini • © 2026 Bản quyền thuộc về {schoolConfig?.name || "Học viện Phụ nữ Việt Nam"}.
           </p>
         </div>
       </footer>

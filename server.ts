@@ -10,7 +10,7 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import multer from 'multer';
 import mammoth from 'mammoth';
-import { RecruitmentDocument, FAQ, HistoryItem, RecruitmentStats } from './src/types.ts';
+import { RecruitmentDocument, FAQ, HistoryItem, RecruitmentStats, SchoolConfig } from './src/types.ts';
 
 const app = express();
 const PORT = 3000;
@@ -122,6 +122,7 @@ interface DB {
   faqs: FAQ[];
   history: HistoryItem[];
   admins: string[];
+  schoolConfig?: SchoolConfig;
 }
 
 // Initial Database Setup if empty
@@ -138,6 +139,21 @@ function readDB(): DB {
         faqs: INITIAL_FAQS,
         history: [],
         admins: ['tructn@vwa.edu.vn'],
+        schoolConfig: {
+          name: "Học viện Phụ nữ Việt Nam",
+          shortName: "VWA",
+          logoUrl: "",
+          logoIcon: "GraduationCap",
+          address: "Số 68 Nguyễn Chí Thanh, Phường Láng, Hà Nội",
+          hotline: "024.3775.1750",
+          email: "tuyensinh@vwa.edu.vn",
+          website: "https://tuyensinh.hvpnvn.edu.vn/",
+          aiRoutingMode: "hybrid",
+          faqConfidenceThreshold: 40,
+          defaultModel: "gemini-3.5-flash",
+          aiMaxTokens: 4000,
+          enableCache: true
+        }
       };
       fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
       return data;
@@ -161,10 +177,64 @@ function readDB(): DB {
         console.error('Không cập nhật được email tructn vào danh sách admins:', writeErr);
       }
     }
+
+    if (!parsed.schoolConfig) {
+      parsed.schoolConfig = {
+        name: "Học viện Phụ nữ Việt Nam",
+        shortName: "VWA",
+        logoUrl: "",
+        logoIcon: "GraduationCap",
+        address: "Số 68 Nguyễn Chí Thanh, Phường Láng, Hà Nội",
+        hotline: "024.3775.1750",
+        email: "tuyensinh@vwa.edu.vn",
+        website: "https://tuyensinh.hvpnvn.edu.vn/",
+        aiRoutingMode: "hybrid",
+        faqConfidenceThreshold: 40,
+        defaultModel: "gemini-3.5-flash",
+        aiMaxTokens: 4000,
+        enableCache: true
+      };
+      try {
+        fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf-8');
+      } catch (writeErr) {
+        console.error('Không cập nhật được schoolConfig vào DB:', writeErr);
+      }
+    } else {
+      let updatedObj = false;
+      if (!parsed.schoolConfig.aiRoutingMode) { parsed.schoolConfig.aiRoutingMode = 'hybrid'; updatedObj = true; }
+      if (parsed.schoolConfig.faqConfidenceThreshold === undefined) { parsed.schoolConfig.faqConfidenceThreshold = 40; updatedObj = true; }
+      if (!parsed.schoolConfig.defaultModel) { parsed.schoolConfig.defaultModel = 'gemini-3.5-flash'; updatedObj = true; }
+      if (parsed.schoolConfig.aiMaxTokens === undefined) { parsed.schoolConfig.aiMaxTokens = 4000; updatedObj = true; }
+      if (parsed.schoolConfig.enableCache === undefined) { parsed.schoolConfig.enableCache = true; updatedObj = true; }
+      
+      if (updatedObj) {
+        try {
+          fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf-8');
+        } catch (writeErr) {
+          console.error('Không ghi được Cost fields bổ sung vào schoolConfig:', writeErr);
+        }
+      }
+    }
+
     return parsed as DB;
   } catch (err) {
     console.error('Lỗi khi đọc file db.json:', err);
-    return { documents: [], faqs: [], history: [], admins: ['tructn@vwa.edu.vn'] };
+    return { 
+      documents: [], 
+      faqs: [], 
+      history: [], 
+      admins: ['tructn@vwa.edu.vn'],
+      schoolConfig: {
+        name: "Học viện Phụ nữ Việt Nam",
+        shortName: "VWA",
+        logoUrl: "",
+        logoIcon: "GraduationCap",
+        address: "Số 68 Nguyễn Chí Thanh, Phường Láng, Hà Nội",
+        hotline: "024.3775.1750",
+        email: "tuyensinh@vwa.edu.vn",
+        website: "https://tuyensinh.hvpnvn.edu.vn/"
+      }
+    };
   }
 }
 
@@ -1071,8 +1141,7 @@ app.get('/api/stats', (req, res) => {
 function generateSmartRuleResponse(message: string, context: string, sources: string[], matchedFaqText: string): { answer: string, suggested: string[] } {
   const lowerMsg = message.toLowerCase();
   
-  let greeting = `🌸 **Kính chào Quý phụ huynh và các bạn thí sinh!**\n\n`;
-  greeting += `Ban tuyển sinh Học viện Phụ nữ Việt Nam xin gửi lời chào trân trọng nhất. Hiện tại hệ thống phản hồi tự động đang bận, Ban tư vấn học viện đã tra cứu trực tiếp từ các quyết định và văn bản tuyển sinh chính thức để hỗ trợ giải đáp nhanh nhất cho bạn:\n\n`;
+  let greeting = '';
 
   let body = '';
   
@@ -1089,7 +1158,7 @@ function generateSmartRuleResponse(message: string, context: string, sources: st
   }
 
   if (context) {
-    body += `### 📄 Thông số trích lục chính thức từ Đề án tuyển sinh học viện:\n\n`;
+    if (body) body += `\n`;
     
     // Split context by segments
     const segments = context.split('\n\n---\n\n');
@@ -1109,26 +1178,17 @@ function generateSmartRuleResponse(message: string, context: string, sources: st
       body += `#### 🔹 Trích nghị từ văn bản: *${sourceTitle}*\n\n${cleanSeg}\n\n`;
       hasRelevantDetails = true;
     });
-
-    if (!hasRelevantDetails) {
-      body += `*(Dữ liệu tuyển sinh chi tiết đang được đồng bộ, xin vui lòng kiểm tra bảng hoặc liên hệ số hotline học viện)*\n\n`;
-    }
   }
 
   if (!context && !matchedFaqText) {
-    body += `Dạ, hiện tại Ban tuyển sinh chưa tìm thấy đoạn trích chi tiết khớp trực tiếp với câu hỏi của bạn trong tài liệu tuyển sinh hiện hành.\n\n`;
-    body += `**Bạn có thể tham khảo một số thông tin quan trọng của Học viện Phụ nữ Việt Nam dưới đây:**\n`;
-    body += `- **Các ngành Đại học Chính quy nổi bật:** Công nghệ thông tin (7480201), Truyền thông đa phương tiện (7320104), Giới và phát triển, Quản trị kinh doanh, Luật, Công tác xã hội, Tâm lý học, Quản trị dịch vụ du lịch và lữ hành...\n`;
+    body += `Dạ, hiện tại Ban tuyển sinh chưa tìm thấy đoạn trích chi tiết khớp trực tiếp với câu hỏi của bạn.\n\n`;
+    body += `**Bạn có thể tham khảo một số thông tin quan trọng dưới đây:**\n`;
+    body += `- **Các ngành Đại học Chính quy:** Công nghệ thông tin (7480201), Truyền thông đa phương tiện (7320104), Giới và phát triển, Quản trị kinh doanh, Luật, Công tác xã hội, Tâm lý học, Quản trị dịch vụ du lịch và lữ hành...\n`;
     body += `- **Phương xét tuyển học bạ:** Thí sinh đăng ký trực tuyến bằng học bạ THPT. Hồ sơ gồm phiếu đăng ký học viện, học bạ THPT công chứng, CMND/CCCD.\n`;
     body += `- **Tuyển sinh Sau đại học:** Đào tạo trình độ Thạc sĩ các ngành Luật hiến pháp & Luật hành chính, Công tác xã hội, Quản trị kinh doanh.\n`;
-    body += `- **Đại học sđt liên hệ:** 024.3775.1750 | **Sau đại học sđt liên hệ:** 024.3775.1750.\n\n`;
-    body += `*(Bạn vui lòng viết câu hỏi rõ ràng hơn kèm các từ khóa như "học bạ", "học phí", "chỉ tiêu", "đăng ký nộp hồ sơ", hoặc tên ngành bạn quan tâm để Ban tư vấn hỗ trợ dò tìm tối ưu nhất)*\n\n`;
   }
 
-  let footer = `\n---\n`;
-  footer += `📞 **Hotline tuyển sinh chính thức:** 024.3775.1750\n`;
-  footer += `🏢 **Học viện Phụ nữ Việt Nam:** Số 68 đường Nguyễn Chí Thanh, phường Láng Thượng, quận Đống Đa, TP. Hà Nội.\n`;
-  footer += `*⚠️ Lưu ý: Nội dung phản hồi được rà soát trực tiếp từ tài liệu tuyển sinh chính thức của Học viện.*`;
+  let footer = '';
 
   const suggested = [
     "Phương thức xét tuyển bằng học bạ THPT cần điều kiện gì?",
@@ -1156,6 +1216,304 @@ function generateSmartRuleResponse(message: string, context: string, sources: st
   };
 }
 
+interface ChatCacheEntry {
+  answer: string;
+  suggested: string[];
+  date: number;
+}
+const chatCache = new Map<string, ChatCacheEntry>();
+
+function scoreFaqMatch(userQuery: string, faqQuestion: string): number {
+  const q1 = userQuery.toLowerCase().replace(/[?.,!/]/g, '').trim();
+  const q2 = faqQuestion.toLowerCase().replace(/[?.,!/]/g, '').trim();
+  
+  if (q1 === q2) return 1.0; // Perfect match
+  
+  const words1 = q1.split(/\s+/).filter(w => w.length > 2);
+  const words2 = q2.split(/\s+/).filter(w => w.length > 2);
+  
+  if (words1.length === 0 || words2.length === 0) return 0;
+  
+  let matchCount = 0;
+  words1.forEach(w => {
+    if (words2.includes(w)) {
+      matchCount++;
+    }
+  });
+  
+  return (2 * matchCount) / (words1.length + words2.length);
+}
+
+// 5.5 ROBUST GEIMINI RESPONSE CLEANING & RECOVERY HELPERS
+function cleanJsonString(str: string): string {
+  if (!str) return '{}';
+  
+  let cleaned = str.trim();
+  // Remove markdown code blocks if present
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```(?:json)?\n?/, "");
+    cleaned = cleaned.replace(/\n?```$/, "");
+    cleaned = cleaned.trim();
+  }
+
+  // Scan and escape unescaped literal newlines and control characters inside double-quoted strings
+  let result = "";
+  let inString = false;
+  let escapeActive = false;
+
+  for (let i = 0; i < cleaned.length; i++) {
+    const char = cleaned[i];
+
+    if (inString) {
+      if (escapeActive) {
+        result += char;
+        escapeActive = false;
+      } else if (char === '\\') {
+        result += char;
+        escapeActive = true;
+      } else if (char === '"') {
+        result += char;
+        inString = false;
+      } else if (char === '\n') {
+        result += '\\n';
+      } else if (char === '\r') {
+        result += '\\r';
+      } else if (char === '\t') {
+        result += '\\t';
+      } else {
+        result += char;
+      }
+    } else {
+      result += char;
+      if (char === '"') {
+        inString = true;
+      }
+    }
+  }
+  return result;
+}
+
+function safeParseGeminiResponse(rawText: string): { answer: string; suggested: string[] } {
+  const trimmed = rawText.trim();
+  
+  // Tier 1: Try parsing directly to avoid any potential corruption from regex or custom cleaners
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed === 'object') {
+      return {
+        answer: parsed.answer || "Dạ, Học viện chưa tìm thấy thông tin tương thích.",
+        suggested: Array.isArray(parsed.suggested) ? parsed.suggested : []
+      };
+    }
+  } catch (err) {
+    // Standard parse failed, proceed to next steps
+  }
+
+  // Tier 2: Strip outer markdown wrappers (```json ... ```) first, then parse directly
+  let stripped = trimmed;
+  if (stripped.startsWith("```")) {
+    stripped = stripped.replace(/^```(?:json)?\n?/, "");
+    stripped = stripped.replace(/\n?```$/, "");
+    stripped = stripped.trim();
+  }
+
+  try {
+    const parsed = JSON.parse(stripped);
+    if (parsed && typeof parsed === 'object') {
+      return {
+        answer: parsed.answer || "Dạ, Học viện chưa tìm thấy thông tin tương thích.",
+        suggested: Array.isArray(parsed.suggested) ? parsed.suggested : []
+      };
+    }
+  } catch (err) {
+    // Continue below
+  }
+
+  // Tier 3: Extreme Custom Non-Strict Parser (Extract text blocks directly from raw string)
+  // This completely bypasses JSON syntax errors like unescaped nested quotes in answer or suggestions
+  try {
+    let textToScan = trimmed;
+    if (textToScan.startsWith("```")) {
+      textToScan = textToScan.replace(/^```(?:json)?\n?/, "");
+      textToScan = textToScan.replace(/\n?```$/, "");
+      textToScan = textToScan.trim();
+    }
+
+    let answer = "";
+    let suggested: string[] = [];
+
+    // 1. Extract "answer" string
+    const answerKeyMatch = textToScan.match(/"answer"\s*:\s*"/);
+    if (answerKeyMatch && answerKeyMatch.index !== undefined) {
+      const startIdx = answerKeyMatch.index + answerKeyMatch[0].length;
+      
+      // Look for the closing quote of "answer".
+      // We look for where "suggested" or the list end starts.
+      const suggestedKeyMatch = textToScan.match(/"suggested"\s*/);
+      let endIdx = -1;
+
+      if (suggestedKeyMatch && suggestedKeyMatch.index !== undefined && suggestedKeyMatch.index > startIdx) {
+        const suggestedStart = suggestedKeyMatch.index;
+        // Search backwards from suggestedStart - 1
+        for (let j = suggestedStart - 1; j >= startIdx; j--) {
+          if (textToScan[j] === '"') {
+            const sub = textToScan.substring(j + 1, suggestedStart).trim();
+            if (sub === "" || sub === "," || sub === ", ") {
+              endIdx = j;
+              break;
+            }
+          }
+        }
+      } else {
+        // If "suggested" is not after "answer", maybe "answer" is at the end.
+        // Search backwards from the end of the string.
+        for (let j = textToScan.length - 1; j >= startIdx; j--) {
+          if (textToScan[j] === '"') {
+            const sub = textToScan.substring(j + 1).trim();
+            if (sub === "" || sub === "}" || sub === "}\n" || sub === "};") {
+              endIdx = j;
+              break;
+            }
+          }
+        }
+      }
+
+      if (endIdx !== -1) {
+        const rawContent = textToScan.substring(startIdx, endIdx);
+        // Replace standard escape sequences
+        answer = rawContent
+          .replace(/\\n/g, '\n')
+          .replace(/\\r/g, '\r')
+          .replace(/\\t/g, '\t')
+          .replace(/\\"/g, '"')
+          .replace(/\\\\/g, '\\');
+      } else {
+        // Fallback for truncated JSON where closing quote of "answer" string is cut off
+        let rawContent = textToScan.substring(startIdx).trim();
+        if (rawContent.endsWith('"}')) {
+          rawContent = rawContent.slice(0, -2);
+        } else if (rawContent.endsWith('}')) {
+          rawContent = rawContent.slice(0, -1);
+        }
+        if (rawContent.endsWith('"')) {
+          rawContent = rawContent.slice(0, -1);
+        }
+        answer = rawContent
+          .replace(/\\n/g, '\n')
+          .replace(/\\r/g, '\r')
+          .replace(/\\t/g, '\t')
+          .replace(/\\"/g, '"')
+          .replace(/\\\\/g, '\\');
+      }
+    }
+
+    // 2. Extract "suggested" array items
+    const suggestedKeyMatchForList = textToScan.match(/"suggested"\s*/);
+    if (suggestedKeyMatchForList && suggestedKeyMatchForList.index !== undefined) {
+      const listStart = textToScan.indexOf('[', suggestedKeyMatchForList.index);
+      if (listStart !== -1) {
+        const listEnd = textToScan.lastIndexOf(']');
+        if (listEnd !== -1 && listEnd > listStart) {
+          const listText = textToScan.substring(listStart + 1, listEnd).trim();
+          if (listText) {
+            // Trim outer quotes if the entire block starts with " and ends with "
+            let cleanedListText = listText;
+            if (cleanedListText.startsWith('"') && cleanedListText.endsWith('"')) {
+              cleanedListText = cleanedListText.substring(1, cleanedListText.length - 1);
+            }
+            // Split by separator of structure: quote, comma, quote (with arbitrary whitespace/newlines)
+            const items = cleanedListText.split(/"\s*,\s*"/);
+            suggested = items.map(item => 
+              item.trim()
+                .replace(/\\n/g, '\n')
+                .replace(/\\"/g, '"')
+                .replace(/\\\\/g, '\\')
+            ).filter(item => item.length > 0);
+          }
+        }
+      }
+    }
+
+    if (answer || suggested.length > 0) {
+      console.log("[JSON Robust Scanner] Successfully recovered block parse on raw text:", { hasAnswer: !!answer, suggestedCount: suggested.length });
+      return {
+        answer: answer || "Dạ, Học viện chưa tìm thấy thông tin tương thích.",
+        suggested: suggested
+      };
+    }
+  } catch (scanErr) {
+    console.log("[JSON Robust Scanner info] Scanner fallback logic failed, continuing.", scanErr);
+  }
+
+  // Tier 4: Run custom robust cleaning to handle unescaped control codes and parse
+  const cleaned = cleanJsonString(rawText);
+  try {
+    const parsed = JSON.parse(cleaned);
+    return {
+      answer: parsed.answer || "Dạ, Học viện chưa tìm thấy thông tin tương thích.",
+      suggested: Array.isArray(parsed.suggested) ? parsed.suggested : []
+    };
+  } catch (parseErr) {
+    console.log("[JSON Parse Err debug] Failed standard JSON parse on cleaned text, executing regex recovery.", parseErr);
+    
+    let answer = "";
+    const suggested: string[] = [];
+    
+    // Regex fallback: Match "answer" field
+    const answerMatch = cleaned.match(/"answer"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"|}|,?\s*"suggested")/);
+    if (answerMatch && answerMatch[1]) {
+      answer = answerMatch[1]
+        .replace(/\\n/g, '\n')
+        .replace(/\\r/g, '\r')
+        .replace(/\\t/g, '\t')
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\');
+    } else {
+      const looseAnswerMatch = cleaned.match(/"answer"\s*:\s*"([\s\S]*)$/);
+      if (looseAnswerMatch && looseAnswerMatch[1]) {
+        let rawAns = looseAnswerMatch[1].trim();
+        if (rawAns.endsWith('"}')) {
+          rawAns = rawAns.slice(0, -2);
+        } else if (rawAns.endsWith('}')) {
+          rawAns = rawAns.slice(0, -1);
+        }
+        answer = rawAns
+          .replace(/\\n/g, '\n')
+          .replace(/\\r/g, '\r')
+          .replace(/\\t/g, '\t')
+          .replace(/\\"/g, '"')
+          .replace(/\\\\/g, '\\');
+      }
+    }
+
+    // Match "suggested" field list
+    const suggestedMatch = cleaned.match(/"suggested"\s*:\s*\[([\s\S]*?)\]/);
+    if (suggestedMatch && suggestedMatch[1]) {
+      const itemsText = suggestedMatch[1];
+      const itemRegex = /"([^"\\]*(?:\\.[^"\\]*)*)"/g;
+      let m;
+      while ((m = itemRegex.exec(itemsText)) !== null) {
+        suggested.push(
+          m[1]
+            .replace(/\\n/g, '\n')
+            .replace(/\\"/g, '"')
+            .replace(/\\\\/g, '\\')
+        );
+      }
+    }
+
+    if (answer || suggested.length > 0) {
+      console.log("[JSON Regex Recovery] Successfully extracted from broken JSON:", { hasAnswer: !!answer, suggestedCount: suggested.length });
+      return { 
+        answer: answer || "Dạ, Học viện chưa tìm thấy thông tin tương thích.", 
+        suggested 
+      };
+    }
+    
+    throw parseErr;
+  }
+}
+
 // 6. CHATBOT CORE INTELLIGENT HANDLER
 app.post('/api/chat', async (req, res) => {
   try {
@@ -1167,7 +1525,107 @@ app.post('/api/chat', async (req, res) => {
     const db = readDB();
     const gemini = getGeminiClient();
 
-    // 1. Auto detect category & tag keywords
+    // 0. Đọc cấu hình phân hệ kiểm soát chi phi & định tuyến AI
+    const config = db.schoolConfig || {
+      aiRoutingMode: 'hybrid',
+      faqConfidenceThreshold: 40,
+      defaultModel: 'gemini-3.5-flash',
+      aiMaxTokens: 4000,
+      enableCache: true
+    };
+    const routingMode = config.aiRoutingMode || 'hybrid';
+    const confidenceThreshold = config.faqConfidenceThreshold !== undefined ? Number(config.faqConfidenceThreshold) : 40;
+    const currentModel = config.defaultModel || 'gemini-3.5-flash';
+    const maxTokens = config.aiMaxTokens !== undefined ? Math.max(Number(config.aiMaxTokens), 4000) : 4000;
+    const isCacheEnabled = config.enableCache !== undefined ? Boolean(config.enableCache) : true;
+
+    // 1. Kiểm tra bộ nhớ đệm (Response Cache) - Hoàn toàn miễn phí, phản hồi tức thì
+    const cacheKey = `${message.trim().toLowerCase()}##${activeCategory || 'all'}`;
+    if (isCacheEnabled && chatCache.has(cacheKey)) {
+      const cached = chatCache.get(cacheKey)!;
+      if (Date.now() - cached.date < 43200000) { // Bộ nhớ đệm hợp lệ trong 12 tiếng
+        console.log(`[Cache Hit] Trả về câu trả lời đã lưu từ bộ nhớ cache cho câu hỏi: "${message}"`);
+        
+        const historyId = 'hist_cache_' + Date.now();
+        db.history.unshift({
+          id: historyId,
+          timestamp: new Date().toISOString(),
+          question: message,
+          answer: cached.answer,
+          categoryMatched: activeCategory === 'all' ? 'general' : activeCategory,
+          feedback: null,
+          tags: ['Cache-Hit'],
+          documentReferenced: ['Bộ nhớ đệm thông minh']
+        });
+        writeDB(db);
+
+        return res.json({
+          success: true,
+          id: historyId,
+          answer: cached.answer,
+          suggested: cached.suggested,
+          isCached: true,
+          routingStrategy: 'response_cache'
+        });
+      }
+    }
+
+    // 2. Chế độ Định tuyến FAQ nội bộ trước (Bypass LLM nếu độ tương đồng cao)
+    let bestFaq: FAQ | null = null;
+    let highestScore = 0;
+    if (routingMode === 'hybrid' || routingMode === 'faq_only') {
+      db.faqs.forEach(faq => {
+        const score = scoreFaqMatch(message, faq.question);
+        if (score > highestScore) {
+          highestScore = score;
+          bestFaq = faq;
+        }
+      });
+    }
+
+    if ((routingMode === 'hybrid' && bestFaq && (highestScore * 100 >= confidenceThreshold)) || (routingMode === 'faq_only' && bestFaq && highestScore > 0.15)) {
+      console.log(`[Router Match] Đã tìm thấy FAQ tương thích cao (${Math.round(highestScore * 100)}%). Bỏ qua cuộc gọi API tới Gemini để tiết kiệm token!`);
+      
+      const replyAnswer = bestFaq!.answer;
+      const defaultSuggestions = [
+        "Xét tuyển bằng phương thức học bạ ra sao?",
+        "Học phí hệ chính quy dự kiến năm nay là bao nhiêu?",
+        "Chế độ học bổng ưu đãi của trường?"
+      ];
+      const relatedFaqs = db.faqs
+        .filter(f => f.id !== bestFaq!.id)
+        .slice(0, 3)
+        .map(f => f.question);
+      const suggestions = relatedFaqs.length >= 3 ? relatedFaqs : [...relatedFaqs, ...defaultSuggestions].slice(0, 3);
+      
+      const historyId = 'hist_faq_' + Date.now();
+      db.history.unshift({
+        id: historyId,
+        timestamp: new Date().toISOString(),
+        question: message,
+        answer: replyAnswer,
+        categoryMatched: bestFaq!.category || 'general',
+        feedback: null,
+        tags: bestFaq!.tags || ['FAQ-Matched'],
+        documentReferenced: ['Cơ sở dữ liệu FAQ nội bộ']
+      });
+      writeDB(db);
+
+      if (isCacheEnabled) {
+        chatCache.set(cacheKey, { answer: replyAnswer, suggested: suggestions, date: Date.now() });
+      }
+
+      return res.json({
+        success: true,
+        id: historyId,
+        answer: replyAnswer,
+        suggested: suggestions,
+        routingStrategy: 'local_faq_matched',
+        matchConfidence: highestScore
+      });
+    }
+
+    // 3. Tự động nhận diện phân hệ tuyển sinh
     let detectedCategory: 'ug' | 'pg' | 'general' | 'unknown' = 'unknown';
     const msgLower = message.toLowerCase();
     
@@ -1189,17 +1647,60 @@ app.post('/api/chat', async (req, res) => {
       detectedCategory = 'general';
     }
 
-    // Determine category search target
+    // Xác định phân hệ tìm kiếm chính
     const searchCategory = activeCategory && activeCategory !== 'all' ? activeCategory : (detectedCategory === 'unknown' ? 'all' : detectedCategory);
 
-    // 2. Retrieve relevant document context
+    // 4. Trích xuất ngữ cảnh từ đề án tuyển sinh tải lên
     const { context, sources } = searchDocsContext(message, searchCategory);
 
-    // 3. Match from existing FAQs for rapid reference or keyword boosting
+    // Xử lý nốt trường hợp Offline FAQ-Only (Nếu không khớp FAQ ở phần trên thì sinh câu trả lời ngoại tuyến từ đề án)
+    if (routingMode === 'faq_only') {
+      console.log(`[Router Match] Chế độ Offline hoạt động: Sinh câu trả lời nguyên văn từ các tài liệu lưu trữ cục bộ.`);
+      let answerText = '';
+      let refSources: string[] = [];
+      
+      if (context) {
+        answerText = `Dạ, dưới đây là thông tin tuyển sinh chính thức được trích xuất trực tiếp từ hồ sơ đề án lưu trữ của trường:\n\n${context}`;
+        refSources = sources;
+      } else {
+        answerText = `Dạ, hiện tại Ban tuyển sinh chưa tìm thấy thông tin phù hợp với câu hỏi của bạn.`;
+      }
+      
+      const suggestions = db.faqs.slice(0, 3).map(f => f.question);
+      if (suggestions.length < 3) {
+        suggestions.push("Phương thức xét tuyển học bạ đợt mới ra sao?", "Điều kiện tuyển sinh thạc sĩ gồm những gì?", "Liên hệ Ban Tuyển sinh?");
+      }
+      
+      const historyId = 'hist_faq_only_' + Date.now();
+      db.history.unshift({
+        id: historyId,
+        timestamp: new Date().toISOString(),
+        question: message,
+        answer: answerText,
+        categoryMatched: searchCategory === 'all' ? 'general' : searchCategory,
+        feedback: null,
+        tags: ['Offline-Mode'],
+        documentReferenced: refSources
+      });
+      writeDB(db);
+      
+      if (isCacheEnabled) {
+        chatCache.set(cacheKey, { answer: answerText, suggested: suggestions.slice(0, 3), date: Date.now() });
+      }
+      
+      return res.json({
+        success: true,
+        id: historyId,
+        answer: answerText,
+        suggested: suggestions.slice(0, 3),
+        routingStrategy: 'local_offline_only'
+      });
+    }
+
+    // 5. Kết hợp tìm kiếm FAQ cấp hai nhằm làm giàu prompt ngữ cảnh
     let matchedFaqText = '';
     const relevantFaqs = db.faqs.filter(faq => {
       const qLower = faq.question.toLowerCase();
-      // Simple word match check (FAQ trigger check)
       const matchesCount = message.toLowerCase().split(/\s+/).filter(w => w.length > 2 && qLower.includes(w)).length;
       return matchesCount > 2;
     });
@@ -1212,34 +1713,31 @@ app.post('/api/chat', async (req, res) => {
     let mainAnswer = '';
     let suggestedQuestions: string[] = [];
 
-    const systemInstruction = `Bạn là Chuyên gia Tư vấn Tuyển sinh thông thái mang tên "VWA-Admissions-AI" của Học viện Phụ nữ Việt Nam (VWA).
-Hãy trả lời các câu hỏi của phụ huynh, học sinh và học viên một cách tinh tế, ấm áp, tận tụy và cực kỳ chuẩn xác dựa TRÊN NGUỒN TÀI LIỆU CHÍNH THỐNG được cung cấp.
+    const systemInstruction = `Bạn là Chuyên gia Tư vấn Tuyển sinh thông thái mang tên "VWA Assistant" của Học viện Phụ nữ Việt Nam (VWA).
+Hãy trả lời các câu hỏi dựa TRÊN NGUỒN TÀI LIỆU CHÍNH THỐNG được cung cấp.
 
-Học viện Phụ nữ Việt Nam là cơ sở giáo dục đại học công lập của Nhà nước, tuyển sinh bình đẳng cả nam sinh và nữ sinh trên cả nước. Trụ sở học viện tọa lạc tại số 68 đường Nguyễn Chí Thanh, phường Láng Thượng, quận Đống Đa, TP. Hà Nội.
+Khi tư vấn và trả lời, hãy áp dụng các nguyên tắc hàng đầu sau:
+1. ĐƯA THẲNG CÂU TRẢ LỜI ĐẦY ĐỦ, CHI TIẾT & CHÍNH XÁC NHẤT:
+   - Khi có câu hỏi, Bạn phải cung cấp câu trả lời tuyệt đối ĐẦY ĐỦ, CHI TIẾT, TOÀN DIỆN và CHÍNH XÁC NHẤT dựa trên các tài liệu tuyển sinh được cung cấp.
+   - Tuyệt đối KHÔNG ĐƯỢC lược bỏ bớt các thông tin quan trọng, không được tóm tắt quá ngắn làm thiếu hụt số liệu hay nội dung chi tiết cần thiết. Hãy đảm bảo đưa ra câu trả lời chi tiết và rõ ràng nhất để người học không phải tự tìm kiếm hay đoán mò.
+   - Để tiết kiệm token thông minh mà không làm ảnh hưởng đến độ dài và độ chi tiết của câu trả lời, bạn hãy TUYỆT ĐỐI BỎ các câu xã giao chào hỏi lê thê ở đầu câu trả lời và lời kết chúc tụng, dặn dò rườm rà ở cuối câu trả lời.
+   - TUYỆT ĐỐI KHÔNG thêm bất kỳ câu nào đại loại như: "Để được hỗ trợ giải đáp nhanh chóng và đầy đủ...", "Quý học viên vui lòng liên hệ trực tiếp qua số Hotline...", hay câu cảnh báo nguồn "⚠️ Thông tin được tra cứu và trích xuất trực tiếp từ các tài liệu tuyển sinh chính thống..." ở cuối câu trả lời.
 
-Khi tư vấn và trả lời, hãy áp dụng các nguyên tắc hàng đầu sau để bảo đảm tính cá nhân hoá và tự nhiên nhất:
-1. NGÔN NGỮ QUÝ PHÁI, THÂN THIỆN VÀ TỰ NHIÊN:
-   - Sử dụng từ ngữ xưng hô tiếng Việt lịch thiệp, gần gũi, truyền thống (ví dụ: "Dạ, Học viện Phụ nữ Việt Nam xin chào em!", "Chào bạn, Ban tuyển sinh xin được chia sẻ...", "Xin kính thông tin tới Quý phụ huynh...").
-   - Giọng điệu tư vấn viên phải lưu loát, tự nhiên như người Việt bản xứ, nói câu mạch lạc, tránh hành văn cứng nhắc hay thuần thục kiểu máy dịch dịch thuật.
-
-2. XỬ LÝ KHÉO LÉO CÁC CÂU CHÀO HỎI & CÁC CÂU HỎI CHUNG:
-   - Nếu người dùng chỉ nói câu chào xã giao (ví dụ: "chào bạn", "hello", "hi", "tư vấn tôi với", "cho hỏi"), TUYỆT ĐỐI không được báo lỗi "không tìm thấy dữ liệu". Ngược lại, hãy nồng nhiệt đón chào, giới thiệu ngắn gọn về Học viện (vị trí ở HN, đào tạo đa ngành UG & PG, công lập) và gợi ý mở để người dùng hỏi thêm về học bạ, học phí, chỉ tiêu tuyển sinh, v.v.
-
-3. SỰ CHUẨN XÁC VÀ ĐỘ CHẬM TRONG TRÍCH XUẤT SỐ LIỆU ĐỀ ÁN:
-   - Khi dẫn thông tin có số liệu (học phí, tổ hợp môn, mã ngành, hotline, chỉ tiêu tuyển sinh), bạn phải đối chiếu rà soát thật kỹ từ nguồn ngữ cảnh đi kèm và giữ nguyên tính chính xác 100%. Hãy in đậm các mã tổ hợp (ví dụ: **A00**, **D01**), mã ngành (ví dụ: **7480201**), số hotline tuyển sinh (**024.3775.1750**) và học phí cụ thể. Bạn được truyền đạt từ văn bản nào hãy ghi rõ nguồn văn bản đó để người học tin tưởng.
+2. SỰ CHUẨN XÁC TRONG TRÍCH XUẤT SỐ LIỆU ĐỀ ÁN:
+   - Khi dẫn thông tin có số liệu (học phí, tổ hợp môn, mã ngành, hotline, chỉ tiêu tuyển sinh), bạn phải đối chiếu rà soát thật kỹ từ nguồn ngữ cảnh đi kèm và giữ nguyên tính chính xác 100%. Hãy in đậm các mã tổ hợp (ví dụ: **A00**, **D01**), mã ngành (ví dụ: **7480201**), số hotline tuyển sinh (**024.3775.1750**) và học phí cụ thể.
    - TUYỆT ĐỐI KHÔNG tự bịa ra học phí, mã hay con số mà tài liệu không ghi.
 
-4. GIỚI HẠN THÔNG TIN & PHÁT NGÔN AN TOÀN:
-   - Nếu trong dữ liệu cung cấp hoàn toàn không đề cập thông tin cần tìm, hãy khéo léo và chân thành giải thích: "Dạ, hiện tại trong nguồn dữ liệu đề án tuyển sinh chính thức được cung cấp chưa có thông tin chi tiết về [tên nội dung]. Để được hỗ trợ đầy đủ nhất, bạn vui lòng liên hệ trực tiếp qua số Hotline tuyển sinh của Học viện: 024.3775.1750 hoặc trang Fanpage Tuyển sinh Học viện Phụ nữ Việt Nam để các thầy cô hướng dẫn chi tiết ạ!"
+3. GIỚI HẠN THÔNG TIN HOÀN TOÀN TỰ NHIÊN:
+   - Nếu trong dữ liệu cung cấp hoàn toàn không đề cập thông tin cần tìm, hãy chân thành giải thích ngắn gọn: "Dạ, hiện tại trong nguồn dữ liệu đề án tuyển sinh chính thức không có thông tin chi tiết về [tên nội dung]."
 
-5. ĐỊNH DẠNG MƯỢT MÀ, DỄ ĐỌC:
-   - Trả ra Markdown hoàn mỹ, dùng bảng biểu nếu liệt kê danh sách ngành, học phí hay tổ hợp môn. Xuống dòng ngắt đoạn thông thoáng, rõ rệt, không ôm đồm viết nguyên một khối chữ dài khó theo dõi.
-   - Kết thúc câu trả lời bằng một dòng ghi chú in nghiêng thanh lịch và khiêm nhường: "*⚠️ Thông tin được tra cứu và trích xuất trực tiếp từ các tài liệu tuyển sinh chính thống của Học viện Phụ nữ Việt Nam.*"
+4. ĐỊNH DẠNG DẠNG BẢNG (TABLE) KHI LIỆT KÊ SỐ LIỆU:
+   - ĐẶC BIỆT LƯU Ý: Đối với các câu hỏi mang tính chất liệt kê danh sách, chứa số liệu hoặc thống kê (ví dụ: chỉ tiêu tuyển sinh chi tiết từng ngành, danh sách các ngành đào tạo, tổ hợp môn xét tuyển, mức học phí của từng ngành...), bạn BẮT BUỘC phải trình bày dưới dạng BẢNG (Markdown Table) với các cột phân tách rõ ràng (ví dụ: STT, Tên ngành, Mã ngành, Chỉ tiêu, Tổ hợp môn,...).
+   - Tuyệt đối không viết gạch đầu dòng lê thê hoặc một khối chữ liền mạch khó theo dõi khi thông tin có cấu trúc nhiều thành phần cột. Xuống dòng ngắt đoạn thông thoáng, gọn gàng để tối ưu hóa việc hiển thị.
 
 Định dạng đầu ra:
 Bạn bắt buộc phải trả về câu trả lời ở định dạng JSON thô (raw JSON) theo schema:
 {
-  "answer": "Nội dung câu trả lời đầy đủ bằng văn bản Markdown tự nhiên và ấm áp dạt dào cảm xúc tư vấn.",
+  "answer": "Nội dung câu trả lời đầy đủ, vô cùng chi tiết, rõ ràng và chính xác tuyệt đối bằng văn bản Markdown.",
   "suggested": [
     "Câu hỏi gợi ý tiếp theo số 1 phù hợp ngữ cảnh?",
     "Câu hỏi gợi ý tiếp theo số 2 phù hợp ngữ cảnh?",
@@ -1259,7 +1757,7 @@ Hãy trả lời câu hỏi của người dùng và sinh ra 3 câu hỏi gợi 
     if (gemini) {
       try {
         const generation = await generateContentWithRetry(gemini, {
-          model: 'gemini-3.5-flash',
+          model: currentModel,
           contents: promptText,
           config: {
             systemInstruction,
@@ -1274,13 +1772,14 @@ Hãy trả lời câu hỏi của người dùng và sinh ra 3 câu hỏi gợi 
                 }
               },
               required: ['answer', 'suggested']
-            }
+            },
+            maxOutputTokens: maxTokens
           }
         });
 
-        const jsonRes = JSON.parse(generation.text || '{}');
-        mainAnswer = jsonRes.answer || "Dạ, Học viện chưa tìm thấy thông tin tương thích.";
-        suggestedQuestions = jsonRes.suggested || [];
+        const jsonRes = safeParseGeminiResponse(generation.text || '{}');
+        mainAnswer = jsonRes.answer;
+        suggestedQuestions = jsonRes.suggested;
       } catch (err) {
         console.error("Gemini runtime error during chat, using backup rule generation", err);
         const fbObj = generateSmartRuleResponse(message, context, sources, matchedFaqText);
@@ -1291,6 +1790,15 @@ Hãy trả lời câu hỏi của người dùng và sinh ra 3 câu hỏi gợi 
       const fbObj = generateSmartRuleResponse(message, context, sources, matchedFaqText);
       mainAnswer = fbObj.answer;
       suggestedQuestions = fbObj.suggested;
+    }
+
+    // Luôn lưu cache nếu thành công và cache bật
+    if (isCacheEnabled && mainAnswer) {
+      chatCache.set(cacheKey, {
+        answer: mainAnswer,
+        suggested: suggestedQuestions,
+        date: Date.now()
+      });
     }
 
     // 5. Append to database histories
@@ -1327,10 +1835,107 @@ Hãy trả lời câu hỏi của người dùng và sinh ra 3 câu hỏi gợi 
       categoryMatched: detectedCategory,
       sourceDocs: sources,
       suggestedQuestions: suggestedQuestions,
+      routingStrategy: 'llm_gemini_api'
     });
   } catch (err: any) {
     console.error('Lỗi ở Chatbot API:', err);
     res.status(500).json({ success: false, message: 'Lỗi máy chủ: ' + err.message });
+  }
+});
+
+// GET school profile configuration
+app.get('/api/school-config', (req, res) => {
+  try {
+    const db = readDB();
+    res.json(db.schoolConfig || {
+      name: "Học viện Phụ nữ Việt Nam",
+      shortName: "VWA",
+      logoUrl: "",
+      logoIcon: "GraduationCap",
+      address: "Số 68 Nguyễn Chí Thanh, Phường Láng, Hà Nội",
+      hotline: "024.3775.1750",
+      email: "tuyensinh@vwa.edu.vn",
+      website: "https://tuyensinh.hvpnvn.edu.vn/"
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Lỗi tải thông tin đơn vị: ' + err.message });
+  }
+});
+
+// POST update school profile configuration
+app.post('/api/school-config', express.json(), (req, res) => {
+  try {
+    const db = readDB();
+    const newConfig = req.body;
+    if (!newConfig.name || !newConfig.shortName || !newConfig.address) {
+      return res.status(400).json({ success: false, message: 'Thiếu thông tin bắt buộc (Tên trường, Tên viết tắt, Địa chỉ)' });
+    }
+    
+    db.schoolConfig = {
+      name: newConfig.name,
+      shortName: newConfig.shortName,
+      logoUrl: newConfig.logoUrl || '',
+      logoIcon: newConfig.logoIcon || 'GraduationCap',
+      address: newConfig.address,
+      hotline: newConfig.hotline || '024.3775.1750',
+      email: newConfig.email || 'tuyensinh@vwa.edu.vn',
+      website: newConfig.website || 'https://tuyensinh.hvpnvn.edu.vn/',
+      // Phân hệ Tối ưu chi phí & Định tuyến thông minh
+      aiRoutingMode: newConfig.aiRoutingMode || 'hybrid',
+      faqConfidenceThreshold: newConfig.faqConfidenceThreshold !== undefined ? Number(newConfig.faqConfidenceThreshold) : 40,
+      defaultModel: newConfig.defaultModel || 'gemini-3.5-flash',
+      aiMaxTokens: newConfig.aiMaxTokens !== undefined ? Number(newConfig.aiMaxTokens) : 4000,
+      enableCache: newConfig.enableCache !== undefined ? Boolean(newConfig.enableCache) : true
+    };
+    
+    writeDB(db);
+    res.json({ success: true, schoolConfig: db.schoolConfig });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Lỗi lưu thông tin đơn vị: ' + err.message });
+  }
+});
+
+// POST upload custom school logo image
+app.post('/api/school-config/logo', upload.single('logo'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Không có tệp tải lên' });
+    }
+    
+    // Ensure upload directory exists
+    if (!fs.existsSync(UPLOAD_DIR)) {
+      fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    }
+
+    const fileExt = path.extname(req.file.originalname) || '.png';
+    const filename = `logo_school_${Date.now()}${fileExt}`;
+    const destination = path.join(UPLOAD_DIR, filename);
+    
+    fs.writeFileSync(destination, req.file.buffer);
+    
+    const logoUrl = `/api/uploads/${filename}`;
+    
+    const db = readDB();
+    if (!db.schoolConfig) {
+      db.schoolConfig = {
+        name: "Học viện Phụ nữ Việt Nam",
+        shortName: "VWA",
+        logoUrl: logoUrl,
+        logoIcon: "GraduationCap",
+        address: "Số 68 Nguyễn Chí Thanh, Phường Láng, Hà Nội",
+        hotline: "024.3775.1750",
+        email: "tuyensinh@vwa.edu.vn",
+        website: "https://tuyensinh.hvpnvn.edu.vn/"
+      };
+    } else {
+      db.schoolConfig.logoUrl = logoUrl;
+    }
+    writeDB(db);
+    
+    res.json({ success: true, logoUrl, schoolConfig: db.schoolConfig });
+  } catch (err: any) {
+    console.error('Lỗi khi tải logo lên:', err);
+    res.status(500).json({ success: false, message: 'Lỗi tải logo máy chủ: ' + err.message });
   }
 });
 
