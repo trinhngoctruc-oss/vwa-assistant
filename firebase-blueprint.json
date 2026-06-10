@@ -1,0 +1,118 @@
+{
+  "entities": {
+    "SchoolConfig": {
+      "title": "SchoolConfig",
+      "description": "Configuration metadata for the academic institution chatbot routing and layout",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name of the university/college" },
+        "shortName": { "type": "string", "description": "Abbreviated name" },
+        "logoUrl": { "type": "string", "description": "URL path to the school logo image" },
+        "logoIcon": { "type": "string", "description": "Lucide icon name representation" },
+        "address": { "type": "string", "description": "Physical headquarters address" },
+        "hotline": { "type": "string", "description": "Admissions office contact number" },
+        "email": { "type": "string", "description": "Inquiry email address" },
+        "website": { "type": "string", "description": "University admissions portal landing URL" },
+        "aiRoutingMode": { "type": "string", "enum": ["hybrid", "ai_only", "faq_only"] },
+        "faqConfidenceThreshold": { "type": "number", "description": "Local FAQ trigger threshold (0-100)" },
+        "defaultModel": { "type": "string", "description": "Active Gemini model alias" },
+        "aiMaxTokens": { "type": "number", "description": "Upper bounds on API response token allocation" },
+        "enableCache": { "type": "boolean", "description": "Toggle smart response caching" }
+      },
+      "required": ["name", "shortName", "address"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Authorized staff credentials and operational access parameters",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "description": "Standard work account email" },
+        "permissions": { "type": "array", "description": "List of accessible category directories" }
+      },
+      "required": ["email", "permissions"]
+    },
+    "TrainingCategory": {
+      "title": "TrainingCategory",
+      "description": "Admissions category tabs (e.g. Undergraduate, Postgraduate)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique division identity slug" },
+        "name": { "type": "string", "description": "Visible display rubric" },
+        "description": { "type": "string", "description": "Explanatory detail of the division" },
+        "isActive": { "type": "boolean", "description": "Availability toggle" }
+      },
+      "required": ["id", "name", "isActive"]
+    },
+    "FAQ": {
+      "title": "FAQ",
+      "description": "Bypassing knowledgebase records with direct prompt mitigation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier" },
+        "question": { "type": "string", "description": "Canonical user question" },
+        "answer": { "type": "string", "description": "Standard answered body Text" },
+        "category": { "type": "string", "description": "Matched category ID tab link" },
+        "tags": { "type": "array", "description": "Topic keywords taxonomy" }
+      },
+      "required": ["id", "question", "answer", "category"]
+    },
+    "HistoryItem": {
+      "title": "HistoryItem",
+      "description": "Telemetry logs of guest-AI consult dynamics",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "question": { "type": "string" },
+        "answer": { "type": "string" },
+        "categoryMatched": { "type": "string" },
+        "feedback": { "type": "string" },
+        "tags": { "type": "array" },
+        "documentReferenced": { "type": "array" }
+      },
+      "required": ["id", "timestamp", "question", "answer", "categoryMatched"]
+    },
+    "ConsultationItem": {
+      "title": "ConsultationItem",
+      "description": "Pre-registration enrollment inquiry submission form records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "level": { "type": "string", "enum": ["ug", "pg"] },
+        "notes": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "contacted", "cancelled"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "phone", "level", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/configs/schoolConfig": {
+      "schema": "SchoolConfig",
+      "description": "Global school configuration setting document"
+    },
+    "/admins/{email}": {
+      "schema": "Admin",
+      "description": "Authorized admin users with custom permissions"
+    },
+    "/categories/{categoryId}": {
+      "schema": "TrainingCategory",
+      "description": "Active training system categories"
+    },
+    "/faqs/{faqId}": {
+      "schema": "FAQ",
+      "description": "Stored FAQ lookup collection"
+    },
+    "/history/{historyId}": {
+      "schema": "HistoryItem",
+      "description": "Chat log archive records"
+    },
+    "/consultations/{consultationId}": {
+      "schema": "ConsultationItem",
+      "description": "Student consultation requested contacts"
+    }
+  }
+}
