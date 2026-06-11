@@ -3215,12 +3215,6 @@ async function syncStaticRAGDocuments() {
 
 // Setup Vite or build static file serving
 const startExpress = async () => {
-  // Sync static documents on startup
-  await syncStaticRAGDocuments();
-  
-  // Sync dynamic elements from Google Cloud Firestore
-  await syncFirestoreToLocal();
-
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -3237,6 +3231,20 @@ const startExpress = async () => {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`[VWA Admissions Chatbot Server] running on http://0.0.0.0:${PORT}`);
+    
+    // Trigger background sync tasks AFTER starting to listen to prevent port-binding timeouts during container boot
+    console.log('[System Boot] Port bound successfully. Initiating background sync programs...');
+    syncStaticRAGDocuments()
+      .then(() => {
+        console.log('[System Boot] Static RAG files synchronized successfully in background.');
+        return syncFirestoreToLocal();
+      })
+      .then(() => {
+        console.log('[System Boot] Cloud Firestore data cache synchronized in background.');
+      })
+      .catch((err) => {
+        console.error('[System Boot Error] Background initial sync failed:', err);
+      });
   });
 };
 
