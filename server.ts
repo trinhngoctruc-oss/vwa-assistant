@@ -273,7 +273,19 @@ function readDB(): DB {
         }
       };
       // Keep it corrupted? or backup? Let's rename it
-      fs.renameSync(DB_FILE, DB_FILE + '.corrupted');
+      const corruptedPath = DB_FILE + '.corrupted';
+      if (fs.existsSync(corruptedPath)) {
+        try {
+          fs.unlinkSync(corruptedPath);
+        } catch (unlinkErr) {
+          console.warn('[readDB Warning] Could not delete existing corrupted DB file:', unlinkErr);
+        }
+      }
+      try {
+        fs.renameSync(DB_FILE, corruptedPath);
+      } catch (renameErr) {
+        console.warn('[readDB Warning] Could not rename corrupted DB file:', renameErr);
+      }
       fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
       return data;
     }
@@ -3215,21 +3227,38 @@ async function syncStaticRAGDocuments() {
 // Setup Vite or build static file serving
 const startExpress = async () => {
   // Check if we are running the production build from 'dist' or if NODE_ENV is set to production
-  const isProduction = process.env.NODE_ENV === 'production' || fs.existsSync(path.join(process.cwd(), 'dist', 'index.html'));
+  // We check both the process.cwd() and __dirname paths to ensure absolute robustness in Cloud Run container environments
+  const isProduction = 
+    process.env.NODE_ENV === 'production' || 
+    fs.existsSync(path.join(process.cwd(), 'dist', 'index.html')) ||
+    fs.existsSync(path.join(__dirname, 'index.html'));
 
   if (!isProduction) {
-    const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
+    try {
+      const { createServer: createViteServer } = await import('vite');
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+      console.log('[System Boot] Started in DEVELOPMENT mode with dynamic Vite middleware.');
+    } catch (viteErr) {
+      console.warn('[System Boot Fallback] Failed to load Vite development server, fallback to PRODUCTION static file serving:', viteErr);
+      const distPath = fs.existsSync(path.join(process.cwd(), 'dist')) ? path.join(process.cwd(), 'dist') : __dirname;
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        const indexPath = fs.existsSync(path.join(distPath, 'index.html')) ? path.join(distPath, 'index.html') : path.join(process.cwd(), 'dist', 'index.html');
+        res.sendFile(indexPath);
+      });
+    }
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    const distPath = fs.existsSync(path.join(process.cwd(), 'dist')) ? path.join(process.cwd(), 'dist') : __dirname;
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      const indexPath = fs.existsSync(path.join(distPath, 'index.html')) ? path.join(distPath, 'index.html') : path.join(process.cwd(), 'dist', 'index.html');
+      res.sendFile(indexPath);
     });
+    console.log('[System Boot] Started in PRODUCTION mode serving static files from:', distPath);
   }
 
   app.listen(PORT, '0.0.0.0', () => {
