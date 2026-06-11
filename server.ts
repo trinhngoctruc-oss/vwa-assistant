@@ -238,7 +238,38 @@ function readDB(): DB {
       return data;
     }
     const fileContent = fs.readFileSync(DB_FILE, 'utf-8');
-    const parsed = JSON.parse(fileContent) as any;
+    let parsed: any;
+    try {
+      parsed = JSON.parse(fileContent);
+    } catch (e) {
+      console.error('[readDB Error] JSON corruption detected. Resetting to default data.', e);
+      // Fallback to default
+      const data: DB = {
+        documents: INITIAL_DOCS,
+        faqs: INITIAL_FAQS,
+        history: [],
+        admins: ['tructn@vwa.edu.vn'],
+        schoolConfig: {
+          name: "Học viện Phụ nữ Việt Nam",
+          shortName: "VWA",
+          logoUrl: "",
+          logoIcon: "GraduationCap",
+          address: "Số 68 Nguyễn Chí Thanh, Phường Láng, Hà Nội",
+          hotline: "024.3775.1750",
+          email: "tuyensinh@vwa.edu.vn",
+          website: "https://tuyensinh.hvpnvn.edu.vn/",
+          aiRoutingMode: "hybrid",
+          faqConfidenceThreshold: 40,
+          defaultModel: "gemini-3.5-flash",
+          aiMaxTokens: 8192,
+          enableCache: true
+        }
+      };
+      // Keep it corrupted? or backup? Let's rename it
+      fs.renameSync(DB_FILE, DB_FILE + '.corrupted');
+      fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      return data;
+    }
     
     // Safety check with default initialization
     if (!parsed.admins || !Array.isArray(parsed.admins)) {
