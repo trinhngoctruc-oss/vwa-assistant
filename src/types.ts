@@ -8,15 +8,13 @@ export interface RecruitmentDocument {
   filename: string;
   title: string;
   content: string;
-  fileType: 'docx' | 'pdf' | 'xlsx' | 'txt' | 'md';
+  fileType: 'docx' | 'pdf' | 'xlsx' | 'txt';
   category: 'ug' | 'pg' | 'general'; // ug = undergraduate (Đại học), pg = postgraduate (Sau Đại học)
   uploadDate: string;
   version: string;
   isLatest: boolean;
   isActive: boolean;
   chunksCount: number;
-  dataPath?: string;
-  ragPath?: string;
 }
 
 export interface FAQ {
@@ -73,15 +71,3 @@ export interface SchoolConfig {
   aiMaxTokens?: number; // max output tokens
   enableCache?: boolean; // toggle response memory caching
 }
-
-export interface ConsultationItem {
-  id: string;
-  name: string;
-  phone: string;
-  email?: string;
-  level: 'ug' | 'pg'; // ug = undergraduate (Đại học), pg = postgraduate (SĐH)
-  notes?: string;
-  status: 'pending' | 'contacted' | 'cancelled';
-  createdAt: string;
-}
-

@@ -146,21 +146,8 @@ export default function App() {
     const left = window.screenX + (window.innerWidth - width) / 2;
     const top = window.screenY + (window.innerHeight - height) / 2;
     window.open(
-      '/api/auth/google',
+      '/google-sign-in.html',
       'google_login_popup',
-      `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`
-    );
-  };
-
-  const handleOpenMicrosoftLogin = () => {
-    setAuthError('');
-    const width = 500;
-    const height = 620;
-    const left = window.screenX + (window.innerWidth - width) / 2;
-    const top = window.screenY + (window.innerHeight - height) / 2;
-    window.open(
-      '/microsoft-sign-in.html',
-      'microsoft_login_popup',
       `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`
     );
   };
@@ -266,36 +253,21 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="space-y-3">
-                        <button
-                          onClick={handleOpenGoogleLogin}
-                          className="w-full bg-white hover:bg-slate-100 text-slate-700 font-bold py-3 px-4 rounded-xl text-xs border border-slate-200 shadow-sm transition-all cursor-pointer flex items-center justify-center space-x-2.5 active:scale-98 transform duration-100"
-                        >
-                          <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none">
-                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                            <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z" fill="#FBBC05"/>
-                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
-                          </svg>
-                          <span>Xác thực bằng Google (@vwa.edu.vn)</span>
-                        </button>
-
-                        <button
-                          onClick={handleOpenMicrosoftLogin}
-                          className="w-full bg-white hover:bg-slate-100 text-slate-700 font-bold py-3 px-4 rounded-xl text-xs border border-slate-200 shadow-sm transition-all cursor-pointer flex items-center justify-center space-x-2.5 active:scale-98 transform duration-100"
-                        >
-                          <div className="grid grid-cols-2 gap-0.5 w-[14px] h-[14px] shrink-0">
-                            <div className="bg-[#f25022] w-1.5 h-1.5"></div>
-                            <div className="bg-[#7fba00] w-1.5 h-1.5"></div>
-                            <div className="bg-[#00a4ef] w-1.5 h-1.5"></div>
-                            <div className="bg-[#ffb900] w-1.5 h-1.5"></div>
-                          </div>
-                          <span>Xác thực bằng Microsoft (@hvpnvn.edu.vn)</span>
-                        </button>
-                      </div>
+                      <button
+                        onClick={handleOpenGoogleLogin}
+                        className="w-full bg-white hover:bg-slate-50 text-slate-700 font-bold py-3.5 px-4 rounded-2xl text-xs border border-slate-200 shadow-sm transition-colors cursor-pointer flex items-center justify-center space-x-2.5 active:scale-98 transform duration-100 animate-bounce"
+                      >
+                        <svg className="h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                          <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z" fill="#FBBC05"/>
+                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+                        </svg>
+                        <span>Đăng nhập bằng tài khoản Google</span>
+                      </button>
 
                       <p className="text-[10px] text-slate-400 mt-5 font-semibold leading-relaxed">
-                        Chỉ các tài khoản được ủy quyền thuộc hai hệ thống tên miền trên mới được quyền tiếp cận cơ sở dữ liệu.
+                        Chỉ các tài khoản được ủy quyền mới được quyền tiếp cận cơ sở dữ liệu.
                       </p>
                     </div>
                   </div>
@@ -314,7 +286,7 @@ export default function App() {
             <p className="text-slate-400 mt-0.5 font-medium font-sans">{schoolConfig?.address ? `Địa chỉ: ${schoolConfig.address}` : "Trụ sở chính: Số 68 Nguyễn Chí Thanh, Phường Láng, Hà Nội"}</p>
           </div>
           <p className="text-[11px] text-slate-400 font-medium">
-            © 2026 Bản quyền thuộc về {schoolConfig?.name || "Học viện Phụ nữ Việt Nam"}.
+            AI-Engine powered by Gemini • © 2026 Bản quyền thuộc về {schoolConfig?.name || "Học viện Phụ nữ Việt Nam"}.
           </p>
         </div>
       </footer>

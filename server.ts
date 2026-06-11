@@ -6,79 +6,21 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import 'dotenv/config';
-import passport from 'passport';
-import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import session from 'express-session';
+import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import multer from 'multer';
 import mammoth from 'mammoth';
 import { RecruitmentDocument, FAQ, HistoryItem, RecruitmentStats, SchoolConfig } from './src/types.ts';
-import { initializeApp as initializeFirebase } from 'firebase/app';
-import { getFirestore as getFirebaseFirestore, initializeFirestore, setLogLevel, doc, getDoc, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore';
 
-// OAuth Configuration
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID || 'fake_id',
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'fake_secret',
-  callbackURL: `${process.env.APP_URL || 'http://localhost:3000'}/api/auth/google/callback`
-},
-(accessToken, refreshToken, profile, done) => {
-  return done(null, profile);
-}
-));
-
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((obj: any, done) => done(null, obj));
-
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const app = express();
-
-app.use(session({
-  secret: 'vwa-secret-key-123456',
-  resave: false,
-  saveUninitialized: false
-}));
-app.use(passport.initialize());
-app.use(passport.session());
+const PORT = 3000;
 
 // Setup database files
 const DB_FILE = path.join(process.cwd(), 'db.json');
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
 
-const DATA_DIR = path.join(UPLOAD_DIR, 'Data');
-const IMAGE_DIR = path.join(UPLOAD_DIR, 'Image');
-const RAG_DIR = path.join(UPLOAD_DIR, 'RAG');
-
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-if (!fs.existsSync(IMAGE_DIR)) fs.mkdirSync(IMAGE_DIR, { recursive: true });
-if (!fs.existsSync(RAG_DIR)) fs.mkdirSync(RAG_DIR, { recursive: true });
-
-// Load Firebase configuration
-const firebaseConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
-let firestoreDb: any = null;
-
-if (fs.existsSync(firebaseConfigPath)) {
-  try {
-    const config = JSON.parse(fs.readFileSync(firebaseConfigPath, 'utf-8'));
-    console.log('[Firebase Init] Loading config:', JSON.stringify(config, null, 2));
-    const firebaseApp = initializeFirebase(config);
-    
-    // Set level to 'error' to silent transient stream connection warnings
-    setLogLevel('error');
-    
-    // Use initializeFirestore with experimentalForceLongPolling to prevent WebSocket/gRPC stream drops on container environment
-    firestoreDb = config.firestoreDatabaseId 
-      ? initializeFirestore(firebaseApp, { experimentalForceLongPolling: true }, config.firestoreDatabaseId)
-      : initializeFirestore(firebaseApp, { experimentalForceLongPolling: true });
-      
-    console.log('[Firebase Init] Khởi tạo Firebase Firestore thành công từ file config! Database ID:', config.firestoreDatabaseId || 'default');
-  } catch (err) {
-    console.error('[Firebase Init Error] Không thể kết nối Firestore:', err);
-  }
-} else {
-  console.log('[Firebase Init] firebase-applet-config.json không tồn tại.');
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
 // Multer storage
@@ -159,14 +101,7 @@ async function generateContentWithRetry(
         errString.includes('rate limit') ||
         errString.includes('high demand') ||
         errString.includes('temporary') ||
-        errString.toLowerCase().includes('timeout') ||
-        errString.toLowerCase().includes('fetch failed') ||
-        errString.toLowerCase().includes('undici') ||
-        errString.toLowerCase().includes('socket') ||
-        errString.toLowerCase().includes('typeerror') ||
-        errString.toLowerCase().includes('network') ||
-        errString.includes('ECONNRESET') ||
-        errString.includes('ETIMEDOUT') ||
+        errString.includes('timeout') ||
         (err.status && [503, 500, 429].includes(err.status));
 
       if (!isRetryable || attempt >= maxRetries) {
@@ -181,34 +116,13 @@ async function generateContentWithRetry(
   }
 }
 
-interface TrainingCategory {
-  id: string;
-  name: string;
-  description?: string;
-  isActive: boolean;
-}
-
-interface ConsultationItem {
-  id: string;
-  name: string;
-  phone: string;
-  email?: string;
-  level: 'ug' | 'pg'; // ug = Đại học, pg = SĐH
-  notes?: string;
-  status: 'pending' | 'contacted' | 'cancelled';
-  createdAt: string;
-}
-
 // Interfaces for our DB structure
 interface DB {
   documents: RecruitmentDocument[];
   faqs: FAQ[];
   history: HistoryItem[];
   admins: string[];
-  adminPermissions?: Record<string, string[]>;
   schoolConfig?: SchoolConfig;
-  categories?: TrainingCategory[];
-  consultations?: ConsultationItem[];
 }
 
 // Initial Database Setup if empty
@@ -237,7 +151,7 @@ function readDB(): DB {
           aiRoutingMode: "hybrid",
           faqConfidenceThreshold: 40,
           defaultModel: "gemini-3.5-flash",
-          aiMaxTokens: 8192,
+          aiMaxTokens: 4000,
           enableCache: true
         }
       };
@@ -245,50 +159,7 @@ function readDB(): DB {
       return data;
     }
     const fileContent = fs.readFileSync(DB_FILE, 'utf-8');
-    let parsed: any;
-    try {
-      parsed = JSON.parse(fileContent);
-    } catch (e) {
-      console.error('[readDB Error] JSON corruption detected. Resetting to default data.', e);
-      // Fallback to default
-      const data: DB = {
-        documents: INITIAL_DOCS,
-        faqs: INITIAL_FAQS,
-        history: [],
-        admins: ['tructn@vwa.edu.vn'],
-        schoolConfig: {
-          name: "Học viện Phụ nữ Việt Nam",
-          shortName: "VWA",
-          logoUrl: "",
-          logoIcon: "GraduationCap",
-          address: "Số 68 Nguyễn Chí Thanh, Phường Láng, Hà Nội",
-          hotline: "024.3775.1750",
-          email: "tuyensinh@vwa.edu.vn",
-          website: "https://tuyensinh.hvpnvn.edu.vn/",
-          aiRoutingMode: "hybrid",
-          faqConfidenceThreshold: 40,
-          defaultModel: "gemini-3.5-flash",
-          aiMaxTokens: 8192,
-          enableCache: true
-        }
-      };
-      // Keep it corrupted? or backup? Let's rename it
-      const corruptedPath = DB_FILE + '.corrupted';
-      if (fs.existsSync(corruptedPath)) {
-        try {
-          fs.unlinkSync(corruptedPath);
-        } catch (unlinkErr) {
-          console.warn('[readDB Warning] Could not delete existing corrupted DB file:', unlinkErr);
-        }
-      }
-      try {
-        fs.renameSync(DB_FILE, corruptedPath);
-      } catch (renameErr) {
-        console.warn('[readDB Warning] Could not rename corrupted DB file:', renameErr);
-      }
-      fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
-      return data;
-    }
+    const parsed = JSON.parse(fileContent) as any;
     
     // Safety check with default initialization
     if (!parsed.admins || !Array.isArray(parsed.admins)) {
@@ -320,7 +191,7 @@ function readDB(): DB {
         aiRoutingMode: "hybrid",
         faqConfidenceThreshold: 40,
         defaultModel: "gemini-3.5-flash",
-        aiMaxTokens: 8192,
+        aiMaxTokens: 4000,
         enableCache: true
       };
       try {
@@ -333,7 +204,7 @@ function readDB(): DB {
       if (!parsed.schoolConfig.aiRoutingMode) { parsed.schoolConfig.aiRoutingMode = 'hybrid'; updatedObj = true; }
       if (parsed.schoolConfig.faqConfidenceThreshold === undefined) { parsed.schoolConfig.faqConfidenceThreshold = 40; updatedObj = true; }
       if (!parsed.schoolConfig.defaultModel) { parsed.schoolConfig.defaultModel = 'gemini-3.5-flash'; updatedObj = true; }
-      if (parsed.schoolConfig.aiMaxTokens === undefined) { parsed.schoolConfig.aiMaxTokens = 8192; updatedObj = true; }
+      if (parsed.schoolConfig.aiMaxTokens === undefined) { parsed.schoolConfig.aiMaxTokens = 4000; updatedObj = true; }
       if (parsed.schoolConfig.enableCache === undefined) { parsed.schoolConfig.enableCache = true; updatedObj = true; }
       
       if (updatedObj) {
@@ -342,28 +213,6 @@ function readDB(): DB {
         } catch (writeErr) {
           console.error('Không ghi được Cost fields bổ sung vào schoolConfig:', writeErr);
         }
-      }
-    }
-
-    if (!parsed.categories || !Array.isArray(parsed.categories)) {
-      parsed.categories = [
-        { id: 'ug', name: 'Đại học Chính quy', description: 'Hệ đào tạo Đại học chính quy Học viện Phụ nữ Việt Nam', isActive: true },
-        { id: 'pg', name: 'Thạc sĩ - Sau đại học', description: 'Chương trình đào tạo Sau đại học gồm Thạc sĩ và Tiến sĩ', isActive: true },
-        { id: 'general', name: 'Hỏi đáp & Tổng quan', description: 'Giải đáp thắc mắc tuyển sinh chung toàn trường', isActive: true }
-      ];
-      try {
-        fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf-8');
-      } catch (writeErr) {
-        console.error('Không cập nhật được categories mặc định vào DB:', writeErr);
-      }
-    }
-
-    if (!parsed.consultations || !Array.isArray(parsed.consultations)) {
-      parsed.consultations = [];
-      try {
-        fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf-8');
-      } catch (writeErr) {
-        console.error('Không cập nhật được consultations mặc định vào DB:', writeErr);
       }
     }
 
@@ -393,183 +242,8 @@ function readDB(): DB {
 function writeDB(data: DB) {
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
-    if (firestoreDb) {
-      syncToFirestoreBackground(data).catch(err => {
-        console.error('[Firebase Background Write Error] Lỗi ghi đồng bộ Firestore:', err);
-      });
-    }
   } catch (err) {
     console.error('Lỗi khi ghi file db.json:', err);
-  }
-}
-
-// Background sync to Firestore to maximize performance and save reads/writes
-async function syncToFirestoreBackground(data: DB) {
-  if (!firestoreDb) return;
-  try {
-    // 1. School Config
-    if (data.schoolConfig) {
-      await setDoc(doc(firestoreDb, 'configs', 'schoolConfig'), data.schoolConfig);
-    }
-
-    // 2. Admins representation (represented as email ids in collection)
-    for (const email of data.admins || []) {
-      const emailLower = email.toLowerCase();
-      const perms = data.adminPermissions?.[emailLower] || ['ug', 'pg', 'general'];
-      await setDoc(doc(firestoreDb, 'admins', emailLower), { permissions: perms });
-    }
-
-    // 3. Sync Categories
-    for (const cat of data.categories || []) {
-      await setDoc(doc(firestoreDb, 'categories', cat.id), cat);
-    }
-
-    // 4. Since saving all FAQs on every write is expensive, let's write newest items
-    if (data.faqs && data.faqs.length > 0) {
-      const newestFaq = data.faqs[data.faqs.length - 1];
-      if (newestFaq && newestFaq.id) {
-        await setDoc(doc(firestoreDb, 'faqs', newestFaq.id), newestFaq);
-      }
-    }
-
-    // 5. Newest consultation item
-    if (data.consultations && data.consultations.length > 0) {
-      const newestCons = data.consultations[data.consultations.length - 1];
-      if (newestCons && newestCons.id) {
-        await setDoc(doc(firestoreDb, 'consultations', newestCons.id), newestCons);
-      }
-    }
-
-    // 6. Newest history item
-    if (data.history && data.history.length > 0) {
-      const newestHist = data.history[data.history.length - 1];
-      if (newestHist && newestHist.id) {
-        await setDoc(doc(firestoreDb, 'history', newestHist.id), newestHist);
-      }
-    }
-  } catch (err) {
-    console.error('[Firebase Background Sync Error]:', err);
-  }
-}
-
-// Sync from Cloud Firestore down to Cache on server boot
-async function syncFirestoreToLocal() {
-  if (!firestoreDb) return;
-  try {
-    console.log('[Firebase Boot Sync] Bắt đầu đồng bộ hóa dữ liệu từ Google Cloud Firestore...');
-    const localDb = readDB();
-    let updated = false;
-
-    // 1. Sync SchoolConfig
-    const configDocRef = doc(firestoreDb, 'configs', 'schoolConfig');
-    const configSnap = await getDoc(configDocRef);
-    if (configSnap.exists()) {
-      localDb.schoolConfig = configSnap.data() as SchoolConfig;
-      updated = true;
-    } else {
-      if (localDb.schoolConfig) {
-        await setDoc(configDocRef, localDb.schoolConfig);
-        console.log('[Firebase Initial Boot] Đã đẩy cấu hình trường lên Cloud Firestore!');
-      }
-    }
-
-    // 2. Sync Admins
-    const adminsColRef = collection(firestoreDb, 'admins');
-    const adminsSnap = await getDocs(adminsColRef);
-    if (!adminsSnap.empty) {
-      const cloudAdmins: string[] = [];
-      const cloudPermissions: Record<string, string[]> = {};
-      adminsSnap.forEach(snap => {
-        const data = snap.data();
-        const email = snap.id.toLowerCase();
-        cloudAdmins.push(email);
-        cloudPermissions[email] = data.permissions || ['ug', 'pg', 'general'];
-      });
-      localDb.admins = cloudAdmins;
-      localDb.adminPermissions = cloudPermissions;
-      updated = true;
-    } else {
-      for (const email of localDb.admins || []) {
-        const emailLower = email.toLowerCase();
-        const perms = localDb.adminPermissions?.[emailLower] || ['ug', 'pg', 'general'];
-        await setDoc(doc(firestoreDb, 'admins', emailLower), { permissions: perms });
-      }
-      console.log('[Firebase Initial Boot] Đã đẩy các cán bộ phân quyền lên Cloud Firestore!');
-    }
-
-    // 3. Sync Categories
-    const catColRef = collection(firestoreDb, 'categories');
-    const catSnap = await getDocs(catColRef);
-    if (!catSnap.empty) {
-      const cloudCats: any[] = [];
-      catSnap.forEach(snap => {
-        cloudCats.push(snap.data());
-      });
-      localDb.categories = cloudCats as any[];
-      updated = true;
-    } else {
-      for (const cat of localDb.categories || []) {
-        await setDoc(doc(firestoreDb, 'categories', cat.id), cat);
-      }
-      console.log('[Firebase Initial Boot] Đã đẩy danh mục phân hệ lên Cloud Firestore!');
-    }
-
-    // 4. Sync FAQs
-    const faqsColRef = collection(firestoreDb, 'faqs');
-    const faqsSnap = await getDocs(faqsColRef);
-    if (!faqsSnap.empty) {
-      const cloudFaqs: FAQ[] = [];
-      faqsSnap.forEach(snap => {
-        cloudFaqs.push(snap.data() as FAQ);
-      });
-      localDb.faqs = cloudFaqs;
-      updated = true;
-    } else {
-      for (const faq of localDb.faqs || []) {
-        await setDoc(doc(firestoreDb, 'faqs', faq.id), faq);
-      }
-      console.log('[Firebase Initial Boot] Đã đẩy danh sách FAQs lên Cloud Firestore!');
-    }
-
-    // 5. Sync Consultations
-    const consColRef = collection(firestoreDb, 'consultations');
-    const consSnap = await getDocs(consColRef);
-    if (!consSnap.empty) {
-      const cloudCons: any[] = [];
-      consSnap.forEach(snap => {
-        cloudCons.push(snap.data());
-      });
-      localDb.consultations = cloudCons;
-      updated = true;
-    } else {
-      for (const con of localDb.consultations || []) {
-        await setDoc(doc(firestoreDb, 'consultations', con.id), con);
-      }
-    }
-
-    // 6. Sync History (Take last 100 maximum)
-    const histColRef = collection(firestoreDb, 'history');
-    const histSnap = await getDocs(histColRef);
-    if (!histSnap.empty) {
-      const cloudHist: HistoryItem[] = [];
-      histSnap.forEach(snap => {
-        cloudHist.push(snap.data() as HistoryItem);
-      });
-      cloudHist.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      localDb.history = cloudHist.slice(0, 100);
-      updated = true;
-    } else {
-      for (const hist of (localDb.history || []).slice(-20)) {
-        await setDoc(doc(firestoreDb, 'history', hist.id), hist);
-      }
-    }
-
-    if (updated) {
-      fs.writeFileSync(DB_FILE, JSON.stringify(localDb, null, 2), 'utf-8');
-      console.log('[Firebase Boot Sync] Đồng bộ hóa thành công! Dữ liệu Cloud đã tải về nạp vào cache.');
-    }
-  } catch (err) {
-    console.error('[Firebase Sync Error] Lỗi đồng bộ hóa dữ liệu từ Firestore lúc khởi động:', err);
   }
 }
 
@@ -654,26 +328,10 @@ function searchDocsContext(query: string, category: 'ug' | 'pg' | 'general' | 'a
 
   // Grouped by document to easily get surrounding window paragraphs (headings/neighboring rows)
   const docParagraphsMap = new Map<string, string[]>();
-  const docLiveContentMap = new Map<string, string>();
   
   for (const doc of activeDocs) {
-    // Read live content directly from physical files under uploads/RAG/ matching user rules 3 & 4
-    let docContent = doc.content;
-    if (doc.ragPath) {
-      const fullPath = path.isAbsolute(doc.ragPath) ? doc.ragPath : path.join(process.cwd(), doc.ragPath);
-      if (fs.existsSync(fullPath)) {
-        try {
-          docContent = fs.readFileSync(fullPath, 'utf-8');
-          console.log(`[RAG Live Disk Match] Read fresh content from ${fullPath}`);
-        } catch (err) {
-          console.error(`[RAG Live Disk Match] Error reading RAG path for ${doc.title}:`, err);
-        }
-      }
-    }
-    docLiveContentMap.set(doc.id, docContent);
-
     // Split by double newline or single newline to keep table row structures
-    const paragraphs = docContent
+    const paragraphs = doc.content
       .split(/\n+/)
       .map(p => p.trim())
       .filter(p => p.length > 5); // keep short headings/rows too for complete context
@@ -773,8 +431,8 @@ function searchDocsContext(query: string, category: 'ug' | 'pg' | 'general' | 'a
   // Sort matched paragraphs by score descending
   scoredParagraphs.sort((a, b) => b.score - a.score);
 
-  // Take the top matched paragraphs (optimized to top 4 segments for cost-efficient RAG)
-  const topMatches = scoredParagraphs.slice(0, 4);
+  // Take the top matched paragraphs (top 20 for rich coverage)
+  const topMatches = scoredParagraphs.slice(0, 20);
   const contextSegments: string[] = [];
   const sourceSet = new Set<string>();
 
@@ -785,7 +443,7 @@ function searchDocsContext(query: string, category: 'ug' | 'pg' | 'general' | 'a
     sourceSet.add(match.docTitle);
     const docParagraphs = docParagraphsMap.get(match.docId) || [];
     
-    // Get adjacent block (parent window window: index - 2, index - 1, index, index + 2)
+    // Get adjacent block (parent window window: index - 2, index - 1, index, index + 1, index + 2)
     // This maintains table headers/rows/surrounding notes perfectly!
     const startIdx = Math.max(0, match.index - 2);
     const endIdx = Math.min(docParagraphs.length - 1, match.index + 2);
@@ -804,7 +462,17 @@ function searchDocsContext(query: string, category: 'ug' | 'pg' | 'general' | 'a
     }
   });
 
-  const finalContext = contextSegments.join('\n\n---\n\n');
+  // Calculate total letters of all doc content loaded to see if full-document injection is possible
+  const totalContentLength = activeDocs.reduce((acc, d) => acc + d.content.length, 0);
+  
+  let finalContext = contextSegments.join('\n\n---\n\n');
+
+  // If the total characters of all active documents combined is reasonable (< 150,000 characters which is approx 25,000 words),
+  // we append the FULL original text of each active document as well. This makes certain that the model CANNOT lose any details!
+  if (totalContentLength < 150000) {
+    const fullDocsText = activeDocs.map(d => `=== TOÀN VĂN TÀI LIỆU TUYỂN SINH HOẠT ĐỘNG: "${d.title}" ===\n${d.content}\n=== KẾT THÚC TOÀN VĂN: "${d.title}" ===`).join('\n\n');
+    finalContext = `[KẾT QUẢ TÌM BIỂU ĐOẠN TRÍCH CHI TIẾT TỪ CHUNK RAG]:\n${finalContext}\n\n======================================================\n\n[DỮ LIỆU TOÀN VĂN TRÍCH XUẤT ĐẦY ĐỦ CỦA CÁC FILE ĐÃ TẢI LÊN (Bắt buộc dùng dữ liệu chính thức này để rà soát chi tiết chính xác 100%)]:\n${fullDocsText}`;
+  }
 
   return {
     context: finalContext,
@@ -823,20 +491,6 @@ app.use('/api/uploads', express.static(UPLOAD_DIR));
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
-
-// OAuth routes
-app.get('/api/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-app.get('/api/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login' }),
-  (req, res) => {
-    res.send(`
-      <script>
-        window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS', user: ${JSON.stringify(req.user)} }, '*');
-        window.close();
-      </script>
-    `);
-  }
-);
 
 // 2. Documents operations
 app.get('/api/documents', (req, res) => {
@@ -883,41 +537,6 @@ app.post('/api/documents/:id/toggle', (req, res) => {
   }
 });
 
-// Helper to manage and create structured subfolders under /uploads
-function getStructuredUploadPaths(filename: string, category: string, uploadDate?: string) {
-  const dateStr = uploadDate || new Date().toISOString().split('T')[0];
-  const cat = category || 'general';
-  
-  const dataDir = path.join(process.cwd(), 'uploads', 'Data', dateStr);
-  const imageDir = path.join(process.cwd(), 'uploads', 'Image', dateStr);
-  const ragDir = path.join(process.cwd(), 'uploads', 'RAG', dateStr);
-  
-  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-  if (!fs.existsSync(imageDir)) fs.mkdirSync(imageDir, { recursive: true });
-  if (!fs.existsSync(ragDir)) fs.mkdirSync(ragDir, { recursive: true });
-  
-  const ext = filename.split('.').pop()?.toLowerCase() || '';
-  const baseName = filename.replace(/\.[^/.]+$/, "");
-  
-  const dataPath = path.join(dataDir, filename);
-  // Structured file name for self-description: [category]__[basename].md
-  const ragPath = path.join(ragDir, `${cat}__${baseName}.md`);
-  
-  // Return relative paths for DB index (so they work on any environment/container cold start)
-  const relativeDataPath = path.join('uploads', 'Data', dateStr, filename);
-  const relativeRagPath = path.join('uploads', 'RAG', dateStr, `${cat}__${baseName}.md`);
-  
-  return { 
-    dataDir, 
-    imageDir, 
-    ragDir, 
-    dataPath, 
-    ragPath,
-    relativeDataPath,
-    relativeRagPath
-  };
-}
-
 // Upload endpoint
 app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
   try {
@@ -928,26 +547,15 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
     const { title, category, version } = req.body;
     const filename = req.file.originalname;
     const ext = filename.split('.').pop()?.toLowerCase() || '';
-    const mimeType = req.file.mimetype;
 
-    const allowedExtensions = ['docx', 'pdf', 'xlsx', 'xls', 'txt', 'png', 'jpg', 'jpeg', 'webp'];
-    if (!allowedExtensions.includes(ext)) {
-      return res.status(400).json({ success: false, message: 'Chỉ hỗ trợ file Word (.docx), PDF (.pdf), Excel (.xlsx/.xls), Text (.txt) và Hình ảnh (.png, .jpg, .jpeg, .webp).' });
+    if (!['docx', 'pdf', 'xlsx', 'xls', 'txt'].includes(ext)) {
+      return res.status(400).json({ success: false, message: 'Chỉ hỗ trợ file Word (.docx), PDF (.pdf), Excel (.xlsx) và Text (.txt).' });
     }
-
-    const docCategory = category || 'general';
-    const uploadDateStr = new Date().toISOString().split('T')[0];
-    
-    // Resolve structured paths
-    const paths = getStructuredUploadPaths(filename, docCategory, uploadDateStr);
 
     let extractedText = '';
 
-    // Choose parsing pipeline based on file type
+    // Upgraded DOCX RAG-optimized extraction
     if (ext === 'docx') {
-      // 1. Double save original file
-      fs.writeFileSync(paths.dataPath, req.file.buffer);
-
       const htmlResult = await mammoth.convertToHtml({ buffer: req.file.buffer });
       const htmlContent = htmlResult.value;
 
@@ -986,7 +594,7 @@ CHÚ Ý QUAN TRỌNG:
           });
           extractedText = cleanMarkdownText(aiRes.text || 'Trống');
         } catch (err: any) {
-          console.error("Lỗi khi dùng Gemini phân tích DOCX HTML, chuyển sang trích xuất thô", err);
+          console.error("Lỗi khi dùng Gemini phân tích DOCX HTML, chuyển sang trích xuất raw text thô", err);
           const result = await mammoth.extractRawText({ buffer: req.file.buffer });
           extractedText = result.value;
         }
@@ -995,58 +603,16 @@ CHÚ Ý QUAN TRỌNG:
         extractedText = result.value;
       }
     } else if (ext === 'txt') {
-      // txt raw direct path write
-      fs.writeFileSync(paths.dataPath, req.file.buffer);
       extractedText = req.file.buffer.toString('utf-8');
-    } else if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
-      // Save to Image as well as Data as requested by User Goal 4
-      fs.writeFileSync(paths.dataPath, req.file.buffer);
-      const destImagePath = path.join(paths.imageDir, filename);
-      fs.writeFileSync(destImagePath, req.file.buffer);
-      console.log(`[Upload] Image physically saved additionally to ${destImagePath}`);
-
-      const gemini = getGeminiClient();
-      if (gemini) {
-        try {
-          const imagePart = {
-            inlineData: {
-              mimeType: mimeType,
-              data: req.file.buffer.toString('base64'),
-            },
-          };
-          
-          const parsePrompt = `Bạn là một Chuyên gia phân tích dữ liệu tuyển sinh Học viện Phụ nữ Việt Nam và lập trình hệ thống RAG (Retrieval-Augmented Generation) cao cấp.
-Bạn nhận được một hình ảnh tuyển sinh đính kèm (chứa thông tin, sơ đồ, bảng chỉ tiêu hoặc biểu phí nhập học...).
-Nhiệm vụ của bạn: Hãy phân tích kỹ hình ảnh này, đọc tất cả văn bản (OCR) và mô tả/chuyển hóa lại toàn bộ thông tin có trong ảnh thành văn bản dạng Markdown chất lượng cao, tối ưu tuyệt đối cho công cụ tìm kiếm và RAG:
-
-1. Trích xuất CHÍNH XÁC 100% tất cả các con số, tên gọi, bảng dữ liệu biểu phí hay chỉ tiêu ngành.
-2. Nếu có bảng biểu hoặc ô trộn dòng/cột: Bạn phải vẽ lại bảng bằng Markdown, điền đầy đủ các ô, nhân bản giá trị ô trộn để dòng nào cũng có ngữ cảnh hoàn chỉnh.
-3. Kèm theo phần diễn giải chi tiết dạng danh sách văn xuôi cho từng hàng của bảng hoặc phần nội dung của ảnh để RAG phân đoạn hiệu quả nhất. Không làm mất bất kỳ một thông tin hay số liệu nào trong ảnh.
-4. Trả về đúng nội dung văn bản Markdown kết quả, không thêm bất kỳ lời dẫn, lời chào hay giải thích gì bên ngoài.`;
-
-          const aiRes = await generateContentWithRetry(gemini, {
-            model: 'gemini-3.5-flash',
-            contents: [imagePart, { text: parsePrompt }]
-          });
-          extractedText = cleanMarkdownText(aiRes.text || 'Trống');
-        } catch (err: any) {
-          console.error("Gemini OCR parser failed, falling back to basic metadata placeholder", err);
-          extractedText = `Hình ảnh tuyển sinh gốc: ${filename}\nTải lên ngày: ${uploadDateStr}\nPhân hệ: ${docCategory}`;
-        }
-      } else {
-        extractedText = `Hình ảnh tuyển sinh gốc: ${filename}\nTải lên ngày: ${uploadDateStr}\nPhân hệ: ${docCategory}`;
-      }
     } else {
-      // PDF or Excel
-      fs.writeFileSync(paths.dataPath, req.file.buffer);
-
+      // PDF or Excel - utilize Gemini to read accurately with RAG-optimized prompts
       const gemini = getGeminiClient();
       if (gemini) {
         try {
-          const targetMimeType = ext === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+          const mimeType = ext === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
           const filePart = {
             inlineData: {
-              mimeType: targetMimeType,
+              mimeType: mimeType,
               data: req.file.buffer.toString('base64'),
             },
           };
@@ -1083,10 +649,6 @@ Hãy bảo đảm giữ nguyên các con số chính xác 100% (học phí, ch�
       }
     }
 
-    // Save final processed RAG text to disk matching user goal 2 & 4
-    fs.writeFileSync(paths.ragPath, extractedText, 'utf-8');
-    console.log(`[Upload] Processed RAG text saved to ${paths.ragPath}`);
-
     // Split paragraphs count
     const chunksCount = extractedText.split(/\n\s*\n/).filter(p => p.trim().length > 30).length || 1;
 
@@ -1096,14 +658,12 @@ Hãy bảo đảm giữ nguyên các con số chính xác 100% (học phí, ch�
       title: title || filename,
       content: extractedText,
       fileType: (ext === 'xls' ? 'xlsx' : ext) as any,
-      category: docCategory as any,
-      uploadDate: uploadDateStr,
+      category: (category || 'general') as any,
+      uploadDate: new Date().toISOString().split('T')[0],
       version: version || '1.0',
       isLatest: true,
       isActive: true,
       chunksCount,
-      dataPath: paths.relativeDataPath,
-      ragPath: paths.relativeRagPath
     };
 
     const db = readDB();
@@ -1185,16 +745,6 @@ app.delete('/api/faqs/:id', (req, res) => {
 
 // 3.5. Admin Authentication & Management
 app.get('/google-sign-in.html', (req, res) => {
-  let firebaseConfigStr = '{}';
-  try {
-    const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-    if (fs.existsSync(configPath)) {
-      firebaseConfigStr = fs.readFileSync(configPath, 'utf-8');
-    }
-  } catch (err) {
-    console.error('Lỗi đọc cấu hình Firebase cho SSO:', err);
-  }
-
   res.send(`
 <!DOCTYPE html>
 <html lang="vi">
@@ -1204,10 +754,6 @@ app.get('/google-sign-in.html', (req, res) => {
     <title>Đăng nhập bằng tài khoản Google - VWA Admissions</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-    <!-- Load Firebase SDK library Compat -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <style>
         body {
             font-family: 'Roboto', sans-serif;
@@ -1216,10 +762,10 @@ app.get('/google-sign-in.html', (req, res) => {
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
-    <div class="bg-white w-full max-w-[450px] rounded-lg border border-[#dadce0] px-8 py-10 shadow-sm transition-all">
+    <div class="bg-white w-full max-w-[450px] rounded-lg border border-[#dadce0] px-10 py-12 shadow-sm transition-all">
         <!-- Google Logo & Heading -->
-        <div class="flex flex-col items-center mb-6">
-            <div class="flex items-center space-x-1.5 mb-2">
+        <div class="flex flex-col items-center mb-8">
+            <div class="flex items-center space-x-1.5 mb-4">
                 <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -1228,110 +774,74 @@ app.get('/google-sign-in.html', (req, res) => {
                 </svg>
                 <span class="font-semibold text-[#202124] text-xl">Google</span>
             </div>
-            <h1 class="text-[#202124] text-xl font-medium mb-1">Cổng đăng nhập SSO cán bộ</h1>
-            <p class="text-[#5f6368] text-xs text-center">Xác thực chính thức VWA Admissions hoặc đối tác</p>
+            <h1 class="text-[#202124] text-2xl font-medium mb-2">Đăng nhập tài khoản</h1>
+            <p class="text-[#5f6368] text-sm text-center">Kết nối Cổng Cán bộ Học viện Phụ nữ Việt Nam</p>
         </div>
 
-        <!-- Connection indicators -->
-        <div id="firebase-status" class="p-2 mb-4 text-[11px] text-center rounded hidden"></div>
+        <!-- Form container -->
+        <div id="login-container">
+            <!-- Step 1: Input email -->
+            <div id="step-email">
+                <div class="relative mb-3">
+                    <input type="email" id="email-input" placeholder=" "
+                        class="block w-full px-4 py-3.5 text-base text-[#202124] bg-transparent border border-[#909399] rounded-md focus:border-[#1a73e8] focus:outline-none transition-all peer" />
+                    <label for="email-input"
+                        class="absolute text-[#5f6368] duration-200 transform scale-75 top-1.5 z-10 origin-[0] bg-white px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:top-3.5 peer-focus:top-1.5 peer-focus:scale-75 peer-focus:text-[#1a73e8] left-3">
+                        Email hoặc Số điện thoại
+                    </label>
+                </div>
+                
+                <div class="mb-5 text-right">
+                    <a href="#" class="text-[#1a73e8] text-xs font-medium hover:underline">Bạn quên địa chỉ email?</a>
+                </div>
 
-        <!-- Choice Panels -->
-        <div class="space-y-4">
-            <!-- 1. Real Google SSO Button (Primary Action) -->
-            <div class="border border-[#e0e0e0] p-4 rounded-lg bg-slate-50/50">
-                <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wide mb-2 flex items-center">
-                    <span class="mr-1">🔐</span> PHƯƠNG THỨC CHÍNH THỨC (REAL SSO)
-                </h3>
-                <p class="text-[11px] text-slate-500 mb-3 leading-relaxed">Xác thực thực tế và đồng bộ dữ liệu cán bộ thông qua Google SSO và lưu trữ tài khoản vào Firebase Firestore:</p>
-                <button id="btn-real-google" onclick="triggerRealGoogleSignIn()"
-                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-md text-xs transition-colors flex items-center justify-center space-x-2 shadow-sm cursor-pointer border border-blue-700">
-                    <svg class="h-4 w-4 fill-white pr-0.5" viewBox="0 0 24 24">
-                        <path d="M12.24 10.285V13.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.86-3.577-7.86-8s3.53-8 7.86-8c2.46 0 4.105 1.025 5.047 1.926l2.427-2.334C17.955 2.192 15.34 1 12.24 1 6.31 1 1.5 5.81 1.5 11.75S6.31 22.5 12.24 22.5c6.19 0 10.3-4.352 10.3-10.477 0-.71-.077-1.25-.175-1.738H12.24z"/>
+                <!-- Org domain reminder banner -->
+                <div class="p-3 bg-blue-50 text-blue-800 text-xs rounded-lg border border-blue-100 mb-6 flex items-start space-x-1.5">
+                    <svg class="h-4 w-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span>Xác thực thật với Google SSO</span>
-                </button>
-            </div>
+                    <span><strong>Bắt buộc:</strong> Chỉ chấp nhận tài khoản có tên miền <strong>@vwa.edu.vn</strong> để chứng minh thẩm quyền cán bộ.</span>
+                </div>
 
-            <!-- Fallback Switch Trigger -->
-            <div id="toggle-simulated-box" class="text-center">
-                <button type="button" onclick="toggleSimulatedView()" class="text-xs text-blue-600 hover:underline hover:text-blue-800 font-medium cursor-pointer">
-                    👉 Bạn không thể đăng nhập thật? Sử dụng chế độ xác thực mật khẩu
-                </button>
-            </div>
+                <div id="email-error" class="text-red-500 text-xs font-semibold mb-4 hidden"></div>
 
-            <!-- 2. Fallback Simulated SSO -->
-            <div id="simulated-box" class="border border-dashed border-[#dadce0] p-4 rounded-lg bg-white hidden">
-                <h3 class="text-xs font-bold text-slate-500 uppercase mb-3 text-center">
-                    CHẾ ĐỘ XÁC THỰC MẬT KHẨU (SIMULATED FALLBACK)
-                </h3>
-                <div id="login-container">
-                    <!-- Step 1: Input email -->
-                    <div id="step-email">
-                        <div class="relative mb-3">
-                            <input type="email" id="email-input" placeholder=" "
-                                class="block w-full px-4 py-2 text-sm text-[#202124] bg-transparent border border-[#909399] rounded-md focus:border-[#1a73e8] focus:outline-none transition-all peer" />
-                            <label for="email-input"
-                                class="absolute text-[#5f6368] duration-200 transform scale-75 top-1 z-10 origin-[0] bg-white px-1.5 peer-placeholder-shown:scale-100 peer-placeholder-shown:top-2 peer-focus:top-1 peer-focus:scale-75 peer-focus:text-[#1a73e8] left-3 text-xs">
-                                Email cán bộ
-                            </label>
-                        </div>
-                        
-                        <!-- Org domain reminder banner -->
-                        <div class="p-3 bg-blue-50 text-blue-800 text-[10.5px] rounded-lg border border-blue-100 mb-3 flex items-start space-x-1.5 leading-tight">
-                            <svg class="h-3.5 w-3.5 shrink-0 mt-0.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span><strong>Hỗ trợ:</strong> Không giới hạn tên miền. Chấp nhận mọi tài khoản Google đại diện cán bộ.</span>
-                        </div>
-
-                        <div id="email-error" class="text-red-500 text-xs font-semibold mb-3 hidden leading-tight"></div>
-
-                        <div class="flex items-center justify-between mt-4">
-                            <button type="button" onclick="toggleSimulatedView()" class="text-xs text-slate-500 hover:underline">Hủy bỏ</button>
-                            <button id="btn-next" 
-                                class="bg-[#1a73e8] text-white hover:bg-[#1557b0] transition-colors px-4 py-1.5 rounded-md font-medium text-xs shadow-sm">
-                                Tiếp theo
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Step 2: Password (slide-in simulator) -->
-                    <div id="step-password" class="hidden">
-                        <div class="flex items-center space-x-2 bg-[#f1f3f4] rounded-full py-1 px-2.5 mb-3 border border-[#dadce0] w-fit mx-auto text-[11px]">
-                            <span id="display-user-email" class="text-[#3c4043] font-medium">tructn@vwa.edu.vn</span>
-                        </div>
-
-                        <div class="relative mb-3">
-                            <input type="password" id="password-input" placeholder=" "
-                                class="block w-full px-4 py-2 text-sm text-[#202124] bg-transparent border border-[#1a73e8] rounded-md focus:outline-none transition-all peer" />
-                            <label for="password-input"
-                                class="absolute text-[#1a73e8] duration-200 transform scale-75 top-1 z-10 origin-[0] bg-white px-1.5 left-3 text-xs">
-                                Nhập mật khẩu giả lập
-                            </label>
-                        </div>
-
-                        <div class="flex items-center space-x-1.5 mb-4">
-                            <input type="checkbox" id="show-pass" class="h-3.5 w-3.5 rounded border-[#dadce0] text-[#1a73e8]" />
-                            <label for="show-pass" class="text-[#3c4043] text-xs">Hiện mật khẩu</label>
-                        </div>
-
-                        <div class="flex items-center justify-between mt-4">
-                            <button id="btn-back" class="text-[#1a73e8] text-xs font-medium hover:underline">Quay lại</button>
-                            <button id="btn-login"
-                                class="bg-[#1a73e8] text-white hover:bg-[#1557b0] transition-colors px-4 py-1.5 rounded-md font-medium text-xs shadow-sm flex items-center space-x-1">
-                                <span id="login-text">Đăng nhập</span>
-                                <div id="login-spinner" class="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin hidden"></div>
-                            </button>
-                        </div>
-                    </div>
+                <div class="flex items-center justify-between mt-8">
+                    <a href="#" class="text-[#1a73e8] text-sm font-medium hover:underline">Tạo tài khoản</a>
+                    <button id="btn-next" 
+                        class="bg-[#1a73e8] text-white hover:bg-[#1557b0] transition-colors px-6 py-2 rounded-md font-medium text-sm shadow-[0_1px_2px_rgba(60,64,67,0.3)]">
+                        Tiếp theo
+                    </button>
                 </div>
             </div>
-            
-            <div id="status-error" class="text-red-500 text-xs font-semibold p-3 bg-red-50 rounded-lg border border-red-100 hidden leading-normal"></div>
-            
-            <div id="real-spinner-box" class="hidden flex flex-col items-center justify-center p-4">
-                <div class="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent mb-2"></div>
-                <p class="text-xs text-blue-700 font-medium">Đang xử lý đăng nhập thực qua Google...</p>
+
+            <!-- Step 2: Password (slide-in simulator) -->
+            <div id="step-password" class="hidden">
+                <div class="flex items-center space-x-2 bg-[#f1f3f4] rounded-full py-1.5 px-3 mb-5 border border-[#dadce0] w-fit mx-auto text-xs">
+                    <span id="display-user-email" class="text-[#3c4043] font-medium">tructn@vwa.edu.vn</span>
+                </div>
+
+                <div class="relative mb-5">
+                    <input type="password" id="password-input" placeholder=" "
+                        class="block w-full px-4 py-3.5 text-base text-[#202124] bg-transparent border border-[#1a73e8] rounded-md focus:outline-none transition-all peer" />
+                    <label for="password-input"
+                        class="absolute text-[#1a73e8] duration-200 transform scale-75 top-1.5 z-10 origin-[0] bg-white px-2 left-3">
+                        Nhập mật khẩu của bạn
+                    </label>
+                </div>
+
+                <div class="flex items-center space-x-2 mb-6">
+                    <input type="checkbox" id="show-pass" class="h-4 w-4 rounded border-[#dadce0] text-[#1a73e8]" />
+                    <label for="show-pass" class="text-[#3c4043] text-sm">Hiện mật khẩu</label>
+                </div>
+
+                <div class="flex items-center justify-between mt-8">
+                    <button id="btn-back" class="text-[#1a73e8] text-sm font-medium hover:underline">Quay lại</button>
+                    <button id="btn-login"
+                        class="bg-[#1a73e8] text-white hover:bg-[#1557b0] transition-colors px-6 py-2 rounded-md font-medium text-sm shadow-[0_1px_2px_rgba(60,64,67,0.3)] flex items-center space-x-1.5">
+                        <span id="login-text">Đăng nhập</span>
+                        <div id="login-spinner" class="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin hidden"></div>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -1343,8 +853,6 @@ app.get('/google-sign-in.html', (req, res) => {
         const passwordInput = document.getElementById('password-input');
         const displayUserEmail = document.getElementById('display-user-email');
         const emailError = document.getElementById('email-error');
-        const statusError = document.getElementById('status-error');
-        const realSpinnerBox = document.getElementById('real-spinner-box');
         
         const btnNext = document.getElementById('btn-next');
         const btnBack = document.getElementById('btn-back');
@@ -1352,475 +860,28 @@ app.get('/google-sign-in.html', (req, res) => {
         const loginText = document.getElementById('login-text');
         const loginSpinner = document.getElementById('login-spinner');
         const showPass = document.getElementById('show-pass');
-
-        // Initialize Firebase
-        const firebaseConfig = ${firebaseConfigStr};
-        let db = null;
-        let auth = null;
-        let isFirebaseAvailable = false;
-
-        try {
-            if (firebaseConfig && firebaseConfig.apiKey) {
-                firebase.initializeApp(firebaseConfig);
-                auth = firebase.auth();
-                db = firebase.firestore();
-                isFirebaseAvailable = true;
-                
-                const statusEl = document.getElementById('firebase-status');
-                statusEl.textContent = "🟢 Tích hợp Firebase Auth động trực tuyến hoạt động";
-                statusEl.className = "p-2 mb-4 text-[10px] text-center rounded bg-emerald-50 text-emerald-800 font-semibold border border-emerald-100 block";
-            }
-        } catch (e) {
-            console.error("Không khởi tạo được Firebase cho Google SSO:", e);
-        }
-
-        function toggleSimulatedView() {
-            const simulatedBox = document.getElementById('simulated-box');
-            const toggleBox = document.getElementById('toggle-simulated-box');
-            if (simulatedBox.classList.contains('hidden')) {
-                simulatedBox.classList.remove('hidden');
-                toggleBox.classList.add('hidden');
-                emailInput.focus();
-            } else {
-                simulatedBox.classList.add('hidden');
-                toggleBox.classList.remove('hidden');
-            }
-        }
-
-        // Live Real Google Authentication!
-        async function triggerRealGoogleSignIn() {
-            if (!isFirebaseAvailable) {
-                showDangerError("Lỗi hệ thống: Firebase chưa được định cấu hình. Vui lòng kiểm tra lại tệp tin cấu hình.");
-                return;
-            }
-
-            hideDangerError();
-            realSpinnerBox.classList.remove('hidden');
-            document.getElementById('btn-real-google').disabled = true;
-
-            const provider = new firebase.auth.GoogleAuthProvider();
-            provider.setCustomParameters({
-                prompt: 'select_account'
-            });
-
-            try {
-                const result = await auth.signInWithPopup(provider);
-                const user = result.user;
-                const email = user.email ? user.email.trim().toLowerCase() : '';
-
-                if (!email) {
-                    showDangerError("Đăng nhập thất bại: Không lấy được địa chỉ email từ tài khoản Google.");
-                    await auth.signOut();
-                    realSpinnerBox.classList.add('hidden');
-                    document.getElementById('btn-real-google').disabled = false;
-                    return;
-                }
-
-                // Store or update account profiles in real Firebase Firestore collection
-                try {
-                    await db.collection('accounts').doc(user.uid).set({
-                        email: email,
-                        name: user.displayName || email.split('@')[0],
-                        photoURL: user.photoURL || '',
-                        providerId: 'google.com',
-                        authenticatedAt: new Date().toISOString(),
-                        type: 'real_google_sso'
-                    }, { merge: true });
-                } catch (fsErr) {
-                    console.warn("Firestore save account trace failed but OAuth successful:", fsErr);
-                }
-
-                // Communicate success back to main window App.tsx
-                postLoginSuccess(email, user.displayName || email.split('@')[0], user.photoURL);
-
-            } catch (authErr) {
-                console.error("Firebase Authentication Error:", authErr);
-                realSpinnerBox.classList.add('hidden');
-                document.getElementById('btn-real-google').disabled = false;
-
-                if (authErr.code === 'auth/operation-not-allowed') {
-                    showDangerError("Cảnh báo: Bạn chưa bật nhà cung cấp đăng nhập 'Google' trong trang cài đặt Firebase Console (Authentication Providers) của dự án " + firebaseConfig.projectId + ". Vui lòng bật nó, hoặc sử dụng phương thức xác thực mật khẩu giả lập dưới đây.");
-                    toggleSimulatedView();
-                } else {
-                    showDangerError("Lỗi xác thực: " + authErr.message);
-                }
-            }
-        }
-
-        function postLoginSuccess(email, displayName, photoURL) {
-            if (window.opener) {
-                window.opener.postMessage({
-                    type: 'OAUTH_AUTH_SUCCESS', 
-                    user: {
-                        email: email,
-                        name: displayName || email.split('@')[0],
-                        picture: photoURL || 'https://lh3.googleusercontent.com/a/default-user=s96-c'
-                    }
-                }, '*');
-                window.close();
-            } else {
-                alert('Xác thực SSO thành công! Đang chuyển hướng...');
-                window.location.href = '/';
-            }
-        }
-
-        function showDangerError(msg) {
-            statusError.textContent = msg;
-            statusError.classList.remove('hidden');
-        }
-
-        function hideDangerError() {
-            statusError.classList.add('hidden');
-        }
 
         // Toggle Password visibility
         showPass.addEventListener('change', function() {
             passwordInput.type = this.checked ? 'text' : 'password';
         });
 
-        // Email Validation & Step Progression for fallback
+        // Email Validation & Step Progression
         btnNext.addEventListener('click', function() {
             const email = emailInput.value.trim();
             if (!email) {
-                showValidationError('Vui lòng nhập địa chỉ email.');
+                showError('Vui lòng nhập địa chỉ email.');
                 return;
             }
 
-            const lowEmail = email.toLowerCase();
-            if (!lowEmail.includes('@')) {
-                showValidationError('Email không hợp lệ. Vui lòng nhập đúng định dạng email.');
+            // Verify email domain is @vwa.edu.vn
+            if (!email.toLowerCase().endsWith('@vwa.edu.vn')) {
+                showError('Email không hợp lệ. Chỉ chấp nhận các tài khoản kết thúc bằng "@vwa.edu.vn" (ví dụ: tructn@vwa.edu.vn).');
                 return;
             }
 
-            hideValidationError();
-            displayUserEmail.textContent = email;
-            stepEmail.classList.add('hidden');
-            stepPassword.classList.remove('hidden');
-            passwordInput.focus();
-        });
-
-        btnBack.addEventListener('click', function() {
-            stepPassword.classList.add('hidden');
-            stepEmail.classList.remove('hidden');
-            emailInput.focus();
-        });
-    </script>
-</body>
-</html>
-  `);
-});
-
-app.get('/microsoft-sign-in.html', (req, res) => {
-  let firebaseConfigStr = '{}';
-  try {
-    const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-    if (fs.existsSync(configPath)) {
-      firebaseConfigStr = fs.readFileSync(configPath, 'utf-8');
-    }
-  } catch (err) {
-    console.error('Lỗi đọc cấu hình Firebase cho Microsoft SSO:', err);
-  }
-
-  res.send(`
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Đăng nhập tài khoản Microsoft - Cổng Cán bộ VWA</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <!-- Load Firebase SDK library Compat -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <style>
-        body {
-            font-family: 'Segoe UI', 'Inter', sans-serif;
-            background-color: #e5e5e5;
-            background-image: radial-gradient(circle at 100% 100%, rgba(0, 120, 215, 0.08) 0%, transparent 40%),
-                              radial-gradient(circle at 0% 0%, rgba(0, 103, 184, 0.05) 0%, transparent 30%);
-        }
-    </style>
-</head>
-<body class="min-h-screen flex items-center justify-center p-4">
-    <div class="bg-white w-full max-w-[440px] rounded-lg p-8 shadow-[0_4px_12px_rgba(0,0,0,0.15)] border border-[#dadce0] transition-all">
-        <!-- Microsoft Logo Grid -->
-        <div class="mb-5 flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-                <div class="grid grid-cols-2 gap-0.5 w-[21px] h-[21px] shrink-0">
-                    <div class="bg-[#f25022] w-2.5 h-2.5"></div>
-                    <div class="bg-[#7fba00] w-2.5 h-2.5"></div>
-                    <div class="bg-[#00a4ef] w-2.5 h-2.5"></div>
-                    <div class="bg-[#ffb900] w-2.5 h-2.5"></div>
-                </div>
-                <span class="font-semibold text-[#737373] text-lg font-sans">Microsoft</span>
-            </div>
-        </div>
-
-        <h1 class="text-[#1b1b1b] text-xl font-semibold mb-1">Cài đặt Đăng nhập Cán bộ</h1>
-        <p class="text-[#505050] text-xs mb-6">Liên kết xác thực tài khoản Microsoft Cán bộ Học viện & Đối tác</p>
-
-        <!-- Connection indicators -->
-        <div id="firebase-status" class="p-2 mb-4 text-[10px] text-center rounded hidden"></div>
-
-        <!-- Multi portal sign-in -->
-        <div class="space-y-4">
-            <!-- 1. Real Microsoft Azure Auth SSO -->
-            <div class="border border-[#e0e0e0] p-4 rounded bg-[#f3f2f1]/50">
-                <h3 class="text-xs font-semibold text-slate-700 tracking-wide mb-2 flex items-center shadow-none">
-                    <span class="mr-1">🔐</span> PHƯƠNG THỨC THƯỜNG TRỰC (REAL AZURE SSO)
-                </h3>
-                <p class="text-[11px] text-slate-500 mb-3 leading-relaxed">Đăng nhập tài khoản Microsoft bất kì thuộc phạm vi liên kết cán bộ và tự động lưu phiên nhận diện:</p>
-                <button id="btn-real-ms" onclick="triggerRealMicrosoftSignIn()"
-                    class="w-full bg-[#0067b8] hover:bg-[#005da6] text-white font-medium py-2 px-4 text-xs transition-colors cursor-pointer flex items-center justify-center space-x-2 shadow-sm">
-                    <div class="grid grid-cols-2 gap-0.5 w-[14px] h-[14px] shrink-0">
-                        <div class="bg-white w-1.5 h-1.5"></div>
-                        <div class="bg-white w-1.5 h-1.5"></div>
-                        <div class="bg-white w-1.5 h-1.5"></div>
-                        <div class="bg-white w-1.5 h-1.5"></div>
-                    </div>
-                    <span>Xác thực thật với Microsoft SSO</span>
-                </button>
-            </div>
-
-            <!-- Fallback Switch Trigger -->
-            <div id="toggle-simulated-box" class="text-center">
-                <button type="button" onclick="toggleSimulatedView()" class="text-xs text-[#0067b8] hover:underline font-semibold cursor-pointer">
-                    👉 Bạn không thể đăng nhập Azure? Sử dụng tài khoản kiểm tra giáo vụ
-                </button>
-            </div>
-
-            <!-- 2. Fallback Credential Login -->
-            <div id="simulated-box" class="border border-dashed border-[#cccccc] p-4 rounded bg-white hidden">
-                <h3 class="text-xs font-bold text-slate-500 uppercase mb-3 text-center">
-                    MẬT KHẨU LIÊN KẾT (FALLBACK CREDENTIAL)
-                </h3>
-                <div id="login-container">
-                    <!-- Step 1: Email Input -->
-                    <div id="step-email">
-                        <div class="relative mb-3 border-b border-[#505050] focus-within:border-[#0067b8] transition-all">
-                            <input type="email" id="email-input" placeholder="Email tài khoản Microsoft cán bộ"
-                                class="block w-full py-1.5 text-xs text-[#000] bg-transparent focus:outline-none placeholder-[#666]" />
-                        </div>
-
-                        <!-- Domain info banner -->
-                        <div class="p-3 bg-[#f3f2f1] text-[#323130] text-[10.5px] rounded-sm mb-3 flex items-start space-x-2 border-l-4 border-[#0067b8] leading-tight">
-                            <svg class="h-3.5 w-3.5 shrink-0 mt-0.5 text-[#0067b8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m0-6v2m0-6h.01M12 2a10 10 0 110 20 10 10 0 010-20z" />
-                            </svg>
-                            <span>Hệ thống hỗ trợ mọi tài khoản Microsoft liên kết cán bộ phân quyền.</span>
-                        </div>
-
-                        <div id="email-error" class="text-red-600 text-xs font-semibold mb-3 hidden leading-tight"></div>
-
-                        <div class="flex items-center justify-between mt-4">
-                            <button type="button" onclick="toggleSimulatedView()" class="text-xs text-slate-500 hover:underline">Hủy bỏ</button>
-                            <button id="btn-next" 
-                                class="bg-[#0067b8] hover:bg-[#005da6] transition-colors text-white px-5 py-1.5 text-xs font-medium">
-                                Tiếp theo
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Step 2: Password Input -->
-                    <div id="step-password" class="hidden">
-                        <div class="flex items-center space-x-1 text-xs text-[#2b2b2b] mb-3 bg-[#f3f2f1] py-1 px-2.5 w-fit rounded-full cursor-pointer hover:bg-[#e1dfdd]" id="btn-show-email">
-                            <svg class="h-3 w-3 text-[#505050]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                            </svg>
-                            <span id="display-user-email" class="font-medium"></span>
-                        </div>
-
-                        <div class="relative mb-3 border-b border-[#505050] focus-within:border-[#0067b8] transition-all">
-                            <input type="password" id="password-input" placeholder="Mật khẩu"
-                                class="block w-full py-1.5 text-xs text-[#000] bg-transparent focus:outline-none placeholder-[#666]" />
-                        </div>
-
-                        <div class="flex items-center space-x-1.5 mb-4">
-                            <input type="checkbox" id="show-pass" class="h-3.5 w-3.5 border-[#505050] rounded-none text-[#0067b8] focus:ring-0" />
-                            <label for="show-pass" class="text-xs text-[#2b2b2b]">Hiển thị mật khẩu</label>
-                        </div>
-
-                        <div class="flex items-center justify-between mt-4">
-                            <button id="btn-back" class="text-[#0067b8] text-xs font-medium hover:underline">Quay lại</button>
-                            <button id="btn-login"
-                                class="bg-[#0067b8] hover:bg-[#005da6] transition-colors text-white px-5 py-1.5 text-xs font-semibold flex items-center space-x-1">
-                                <span id="login-text">Đăng nhập</span>
-                                <div id="login-spinner" class="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin hidden"></div>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="status-error" class="text-red-500 text-xs font-semibold p-3 bg-red-50 rounded-lg border border-red-100 hidden leading-normal"></div>
-
-            <div id="real-spinner-box" class="hidden flex flex-col items-center justify-center p-4">
-                <div class="animate-spin rounded-full h-8 w-8 border-4 border-[#0067b8] border-t-transparent mb-2"></div>
-                <p class="text-xs text-[#0067b8] font-medium">Đang mở xác thực Microsoft Account...</p>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        const stepEmail = document.getElementById('step-email');
-        const stepPassword = document.getElementById('step-password');
-        const emailInput = document.getElementById('email-input');
-        const passwordInput = document.getElementById('password-input');
-        const displayUserEmail = document.getElementById('display-user-email');
-        const emailError = document.getElementById('email-error');
-        const statusError = document.getElementById('status-error');
-        const realSpinnerBox = document.getElementById('real-spinner-box');
-        
-        const btnNext = document.getElementById('btn-next');
-        const btnBack = document.getElementById('btn-back');
-        const btnShowEmail = document.getElementById('btn-show-email');
-        const btnLogin = document.getElementById('btn-login');
-        const loginText = document.getElementById('login-text');
-        const loginSpinner = document.getElementById('login-spinner');
-        const showPass = document.getElementById('show-pass');
-
-        // Initialize Firebase
-        const firebaseConfig = ${firebaseConfigStr};
-        let db = null;
-        let auth = null;
-        let isFirebaseAvailable = false;
-
-        try {
-            if (firebaseConfig && firebaseConfig.apiKey) {
-                firebase.initializeApp(firebaseConfig);
-                auth = firebase.auth();
-                db = firebase.firestore();
-                isFirebaseAvailable = true;
-                
-                const statusEl = document.getElementById('firebase-status');
-                statusEl.textContent = "🟢 Liên kết động Firebase Auth trực tuyến sẵn sàng";
-                statusEl.className = "p-2 mb-4 text-[10px] text-center rounded bg-emerald-50 text-emerald-800 font-semibold border border-emerald-100 block";
-            }
-        } catch (e) {
-            console.error("Không khởi tạo được Firebase cho Microsoft SSO:", e);
-        }
-
-        function toggleSimulatedView() {
-            const simulatedBox = document.getElementById('simulated-box');
-            const toggleBox = document.getElementById('toggle-simulated-box');
-            if (simulatedBox.classList.contains('hidden')) {
-                simulatedBox.classList.remove('hidden');
-                toggleBox.classList.add('hidden');
-                emailInput.focus();
-            } else {
-                simulatedBox.classList.add('hidden');
-                toggleBox.classList.remove('hidden');
-            }
-        }
-
-        // Live Real Microsoft SSO Authentication!
-        async function triggerRealMicrosoftSignIn() {
-            if (!isFirebaseAvailable) {
-                showDangerError("Lỗi hệ thống: Firebase chưa được định cấu hình. Vui lòng kiểm tra lại cấu hình kết nối.");
-                return;
-            }
-
-            hideDangerError();
-            realSpinnerBox.classList.remove('hidden');
-            document.getElementById('btn-real-ms').disabled = true;
-
-            const provider = new firebase.auth.OAuthProvider('microsoft.com');
-            provider.setCustomParameters({
-                prompt: 'select_account',
-                tenant: 'common'
-            });
-
-            try {
-                const result = await auth.signInWithPopup(provider);
-                const user = result.user;
-                const email = user.email ? user.email.trim().toLowerCase() : '';
-
-                if (!email) {
-                    showDangerError("Xác thực Microsoft thất bại: Không lấy được địa chỉ email từ tài khoản.");
-                    await auth.signOut();
-                    realSpinnerBox.classList.add('hidden');
-                    document.getElementById('btn-real-ms').disabled = false;
-                    return;
-                }
-
-                // Store account profile in online Database
-                try {
-                    await db.collection('accounts').doc(user.uid).set({
-                        email: email,
-                        name: user.displayName || email.split('@')[0],
-                        photoURL: user.photoURL || '',
-                        providerId: 'microsoft.com',
-                        authenticatedAt: new Date().toISOString(),
-                        type: 'real_microsoft_sso'
-                    }, { merge: true });
-                } catch (fsErr) {
-                    console.warn("Lỗi lưu thông tin vào Firestore nhưng OAuth đã thành công:", fsErr);
-                }
-
-                // Call post back success
-                postLoginSuccess(email, user.displayName || email.split('@')[0], user.photoURL);
-
-            } catch (authErr) {
-                console.error("Microsoft Login Error:", authErr);
-                realSpinnerBox.classList.add('hidden');
-                document.getElementById('btn-real-ms').disabled = false;
-
-                if (authErr.code === 'auth/operation-not-allowed') {
-                    showDangerError("Cảnh báo: Nhà cung cấp 'Microsoft / Azure AD' chưa được kích hoạt trong Firebase Console dự án " + firebaseConfig.projectId + ". Vui lòng kích hoạt trong Authentication -> Sign-in Method, hoặc sử dụng cổng giả lập dưới đây.");
-                    toggleSimulatedView();
-                } else {
-                    showDangerError("Lỗi đăng nhập Azure: " + authErr.message);
-                }
-            }
-        }
-
-        function postLoginSuccess(email, displayName, photoURL) {
-            if (window.opener) {
-                window.opener.postMessage({
-                    type: 'OAUTH_AUTH_SUCCESS', 
-                    user: {
-                        email: email,
-                        name: displayName || email.split('@')[0],
-                        picture: photoURL || 'https://lh3.googleusercontent.com/a/default-user=s96-c'
-                    }
-                }, '*');
-                window.close();
-            } else {
-                alert('Xác thực SSO thành công! Đang chuyển hướng...');
-                window.location.href = '/';
-            }
-        }
-
-        function showDangerError(msg) {
-            statusError.textContent = msg;
-            statusError.classList.remove('hidden');
-        }
-
-        function hideDangerError() {
-            statusError.classList.add('hidden');
-        }
-
-        showPass.addEventListener('change', function() {
-            passwordInput.type = this.checked ? 'text' : 'password';
-        });
-
-        // Email flow for fallback
-        btnNext.addEventListener('click', function() {
-            const email = emailInput.value.trim();
-            if (!email) {
-                showValidationError('Vui lòng nhập địa chỉ email.');
-                return;
-            }
-
-            const lowEmail = email.toLowerCase();
-            if (!lowEmail.includes('@')) {
-                showValidationError('Địa chỉ email Microsoft không hợp lý. Vui lòng kiểm tra lại cấu trúc email.');
-                return;
-            }
-
-            hideValidationError();
+            // Proceed to password
+            hideError();
             displayUserEmail.textContent = email;
             stepEmail.classList.add('hidden');
             stepPassword.classList.remove('hidden');
@@ -1833,47 +894,42 @@ app.get('/microsoft-sign-in.html', (req, res) => {
             emailInput.focus();
         });
 
-        btnShowEmail.addEventListener('click', function() {
-            btnBack.click();
-        });
-
-        // Fail-safe credential simulation write
+        // Submit Sign-In
         btnLogin.addEventListener('click', function() {
             const email = emailInput.value.trim();
             const password = passwordInput.value;
 
             if (!password || password.length < 4) {
-                alert('Mật khẩu tối thiểu phải từ 4 kí tự.');
+                alert('Mật khẩu của tài khoản VWA tối thiểu 4 kí tự để giả lập đăng nhập.');
                 return;
             }
 
+            // Show Spinner & Disable Buttons
             btnLogin.disabled = true;
             btnBack.disabled = true;
-            loginText.textContent = 'Đang đăng ký phiên...';
+            loginText.textContent = 'Đang xác thực...';
             loginSpinner.classList.remove('hidden');
 
-            setTimeout(async () => {
-                // Persistent recording to client Firestore
-                if (isFirebaseAvailable) {
-                    try {
-                        const fakeUid = 'simulated_ms_' + email.replace(/[^a-zA-Z0-9]/g, '_');
-                        await db.collection('accounts').doc(fakeUid).set({
+            setTimeout(() => {
+                // Return success to the main window
+                if (window.opener) {
+                    window.opener.postMessage({
+                        type: 'OAUTH_AUTH_SUCCESS', 
+                        user: {
                             email: email,
                             name: email.split('@')[0],
-                            photoURL: 'https://lh3.googleusercontent.com/a/default-user=s96-c',
-                            providerId: 'simulated_microsoft_pwd',
-                            authenticatedAt: new Date().toISOString(),
-                            type: 'simulated_credential'
-                        }, { merge: true });
-                    } catch (fsErr) {
-                        console.warn('Lỗi ghi thông tin giả lập lên Firestore:', fsErr);
-                    }
+                            picture: 'https://lh3.googleusercontent.com/a/default-user=s96-c'
+                        }
+                    }, '*');
+                    window.close();
+                } else {
+                    alert('Đăng nhập thành công! Đang tải lại trang...');
+                    window.location.href = '/';
                 }
-
-                postLoginSuccess(email, email.split('@')[0], '');
             }, 1000);
         });
 
+        // Trigger on click Enter
         emailInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') btnNext.click();
         });
@@ -1881,12 +937,12 @@ app.get('/microsoft-sign-in.html', (req, res) => {
             if (e.key === 'Enter') btnLogin.click();
         });
 
-        function showValidationError(msg) {
+        function showError(msg) {
             emailError.textContent = msg;
             emailError.classList.remove('hidden');
         }
 
-        function hideValidationError() {
+        function hideError() {
             emailError.classList.add('hidden');
         }
     </script>
@@ -1903,32 +959,35 @@ app.post('/api/auth/verify', (req, res) => {
   }
 
   const normalized = email.trim().toLowerCase();
+  if (!normalized.endsWith('@vwa.edu.vn')) {
+    return res.json({ 
+      success: false, 
+      message: 'Chỉ chấp nhận tài khoản có địa chỉ kết thúc bằng miền @vwa.edu.vn' 
+    });
+  }
+
   const db = readDB();
   const superadmin = 'tructn@vwa.edu.vn';
-  const superadminGmail = 'trinhngoctruc@gmail.com';
 
-  if (normalized === superadmin || normalized === superadminGmail) {
+  if (normalized === superadmin) {
     return res.json({
       success: true,
       user: {
         email: normalized,
         role: 'superadmin',
-        name: normalized === superadminGmail ? 'Master Admin Trực (Gmail)' : 'Master Admin Trực',
-        categories: ['ug', 'pg', 'general']
+        name: 'Master Admin Trực'
       }
     });
   }
 
   const isAdmin = db.admins && db.admins.map(e => e.toLowerCase()).includes(normalized);
   if (isAdmin) {
-    const cats = (db.adminPermissions && db.adminPermissions[normalized]) || ['ug', 'pg', 'general'];
     return res.json({
       success: true,
       user: {
         email: normalized,
         role: 'admin',
-        name: normalized.split('@')[0],
-        categories: cats
+        name: normalized.split('@')[0]
       }
     });
   }
@@ -1937,40 +996,29 @@ app.post('/api/auth/verify', (req, res) => {
     success: false,
     isUnregisteredAdmin: true,
     email: normalized,
-    message: `Tài khoản của bạn (${normalized}) đã được xác thực thành công. Tuy nhiên quyền truy cập cán bộ chưa được Quản trị tối cao (tructn@vwa.edu.vn) phê duyệt. Vui lòng liên hệ Thầy Trực để được phê duyệt gán quyền cán bộ.`
+    message: 'Tài khoản của bạn đã được xác định thuộc Học viện Phụ nữ Việt Nam. Tuy nhiên quyền truy cập cán bộ chưa được Quản trị tối cao (tructn@vwa.edu.vn) phê duyệt. Vui lòng liên hệ Thầy Trực để được thêm vào danh bạ.'
   });
 });
 
 // APIs managing admin accounts list
 app.get('/api/admins', (req, res) => {
   const requesterEmail = String(req.headers['x-user-email'] || '').trim().toLowerCase();
-  const db = readDB();
-  const adminsList = db.admins || ['tructn@vwa.edu.vn'];
   
-  const isAuthorized = requesterEmail === 'tructn@vwa.edu.vn' || 
-                       requesterEmail === 'trinhngoctruc@gmail.com' || 
-                       adminsList.map(e => e.toLowerCase()).includes(requesterEmail);
-  
-  if (!isAuthorized) {
-    return res.status(403).json({ success: false, message: 'Từ chối truy cập. Bạn không có quyền truy cập trang quản lý cán bộ.' });
+  if (!requesterEmail.endsWith('@vwa.edu.vn')) {
+    return res.status(403).json({ success: false, message: 'Từ chối truy cập. Yêu cầu quyền vwa.edu.vn.' });
   }
 
-  const permissions = db.adminPermissions || {};
-
-  const adminsWithPerms = adminsList.map(email => {
-    const lowEmail = email.toLowerCase();
-    const cats = permissions[lowEmail] || ['ug', 'pg', 'general'];
-    return { email, categories: cats };
-  });
-
-  res.json({ success: true, admins: adminsWithPerms });
+  const db = readDB();
+  // Ensure we list it nicely
+  const adminsList = db.admins || ['tructn@vwa.edu.vn'];
+  res.json({ success: true, admins: adminsList });
 });
 
 app.post('/api/admins', (req, res) => {
   const requesterEmail = String(req.body.creatorEmail || '').trim().toLowerCase();
-  const { newAdminEmail, categories } = req.body;
+  const { newAdminEmail } = req.body;
 
-  if (requesterEmail !== 'tructn@vwa.edu.vn' && requesterEmail !== 'trinhngoctruc@gmail.com') {
+  if (requesterEmail !== 'tructn@vwa.edu.vn') {
     return res.status(403).json({ success: false, message: 'Chỉ có tài khoản quản trị tối cao (tructn@vwa.edu.vn) mới có quyền cấp phép.' });
   }
 
@@ -1979,6 +1027,10 @@ app.post('/api/admins', (req, res) => {
   }
 
   const targetEmail = newAdminEmail.trim().toLowerCase();
+  if (!targetEmail.endsWith('@vwa.edu.vn')) {
+    return res.status(400).json({ success: false, message: 'Cán bộ quản trị bắt buộc phải có địa chỉ kết thúc bằng @vwa.edu.vn.' });
+  }
+
   const db = readDB();
   if (!db.admins) {
     db.admins = ['tructn@vwa.edu.vn'];
@@ -1989,55 +1041,9 @@ app.post('/api/admins', (req, res) => {
   }
 
   db.admins.push(targetEmail);
-
-  if (!db.adminPermissions) {
-    db.adminPermissions = {};
-  }
-  db.adminPermissions[targetEmail] = Array.isArray(categories) && categories.length > 0 ? categories : ['ug', 'pg', 'general'];
-
   writeDB(db);
 
-  const permissions = db.adminPermissions || {};
-  const adminsWithPerms = db.admins.map(email => {
-    const lowEmail = email.toLowerCase();
-    const cats = permissions[lowEmail] || ['ug', 'pg', 'general'];
-    return { email, categories: cats };
-  });
-
-  res.json({ success: true, message: `Thêm cán bộ ${targetEmail} thành công và phân phối phạm vi quản lý!`, admins: adminsWithPerms });
-});
-
-app.put('/api/admins/:email/permissions', (req, res) => {
-  const requesterEmail = String(req.headers['x-user-email'] || '').trim().toLowerCase();
-  const { email } = req.params;
-  const { categories } = req.body;
-
-  if (requesterEmail !== 'tructn@vwa.edu.vn') {
-    return res.status(403).json({ success: false, message: 'Chỉ có tài khoản quản trị tối cao (tructn@vwa.edu.vn) mới có quyền cập nhật phân quyền.' });
-  }
-
-  const targetEmail = String(email || '').trim().toLowerCase();
-  const db = readDB();
-  
-  if (!db.admins || !db.admins.map(e => e.toLowerCase()).includes(targetEmail)) {
-    return res.status(404).json({ success: false, message: 'Không tìm thấy cán bộ để cập nhật quyền.' });
-  }
-
-  if (!db.adminPermissions) {
-    db.adminPermissions = {};
-  }
-
-  db.adminPermissions[targetEmail] = Array.isArray(categories) ? categories : [];
-  writeDB(db);
-
-  const permissions = db.adminPermissions || {};
-  const adminsWithPerms = db.admins.map(email => {
-    const lowEmail = email.toLowerCase();
-    const cats = permissions[lowEmail] || ['ug', 'pg', 'general'];
-    return { email, categories: cats };
-  });
-
-  res.json({ success: true, message: `Cập nhật phân quyền cho ${targetEmail} thành công!`, admins: adminsWithPerms });
+  res.json({ success: true, message: `Thêm cán bộ ${targetEmail} thành công!`, admins: db.admins });
 });
 
 app.delete('/api/admins/:email', (req, res) => {
@@ -2056,155 +1062,10 @@ app.delete('/api/admins/:email', (req, res) => {
   const db = readDB();
   if (db.admins) {
     db.admins = db.admins.filter(e => e.toLowerCase() !== targetEmail);
-    if (db.adminPermissions) {
-      delete db.adminPermissions[targetEmail];
-    }
     writeDB(db);
   }
 
-  const permissions = db.adminPermissions || {};
-  const adminsWithPerms = (db.admins || ['tructn@vwa.edu.vn']).map(email => {
-    const lowEmail = email.toLowerCase();
-    const cats = permissions[lowEmail] || ['ug', 'pg', 'general'];
-    return { email, categories: cats };
-  });
-
-  res.json({ success: true, message: `Đã xóa quyền cán bộ của ${targetEmail}.`, admins: adminsWithPerms });
-});
-
-// Category/System training management endpoints
-app.get('/api/categories', (req, res) => {
-  const db = readDB();
-  if (!db.categories || !Array.isArray(db.categories)) {
-    db.categories = [
-      { id: 'ug', name: 'Đại học Chính quy', description: 'Hệ đào tạo Đại học chính quy Học viện Phụ nữ Việt Nam', isActive: true },
-      { id: 'pg', name: 'Thạc sĩ - Sau đại học', description: 'Chương trình đào tạo Sau đại học gồm Thạc sĩ và Tiến sĩ', isActive: true },
-      { id: 'general', name: 'Hỏi đáp & Tổng quan', description: 'Giải đáp thắc mắc tuyển sinh chung toàn trường', isActive: true }
-    ];
-    writeDB(db);
-  }
-  res.json({ success: true, categories: db.categories });
-});
-
-app.post('/api/categories', (req, res) => {
-  const requesterEmail = String(req.headers['x-user-email'] || '').trim().toLowerCase();
-  const db = readDB();
-  const isAdmin = db.admins && db.admins.map(e => e.toLowerCase()).includes(requesterEmail);
-  const isSuper = requesterEmail === 'tructn@vwa.edu.vn';
-  if (!isAdmin && !isSuper) {
-    return res.status(403).json({ success: false, message: 'Chỉ có cán bộ quản trị mới có quyền thêm hệ đào tạo mới.' });
-  }
-
-  const { id, name, description, isActive } = req.body;
-  if (!id || !name) {
-    return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ Mã hệ (ID) và Tên hệ đào tạo.' });
-  }
-
-  const code = id.trim().toLowerCase();
-  if (!/^[a-z0-9_-]+$/.test(code)) {
-    return res.status(400).json({ success: false, message: 'Mã hệ đào tạo chỉ được chứa chữ thường không dấu, số, dấu gạch dưới hoặc gạch ngang.' });
-  }
-
-  if (!db.categories || !Array.isArray(db.categories)) {
-    db.categories = [
-      { id: 'ug', name: 'Đại học Chính quy', description: 'Hệ đào tạo Đại học chính quy Học viện Phụ nữ Việt Nam', isActive: true },
-      { id: 'pg', name: 'Thạc sĩ - Sau đại học', description: 'Chương trình đào tạo Sau đại học gồm Thạc sĩ và Tiến sĩ', isActive: true },
-      { id: 'general', name: 'Hỏi đáp & Tổng quan', description: 'Giải đáp thắc mắc tuyển sinh chung toàn trường', isActive: true }
-    ];
-  }
-
-  if (db.categories.some(c => c.id === code)) {
-    return res.status(400).json({ success: false, message: `Mã hệ đào tạo "${code}" đã tồn tại trên hệ thống.` });
-  }
-
-  db.categories.push({
-    id: code,
-    name: name.trim(),
-    description: (description || '').trim(),
-    isActive: isActive !== false
-  });
-
-  writeDB(db);
-  res.json({ success: true, message: `Thêm hệ đào tạo "${name.trim()}" thành công!`, categories: db.categories });
-});
-
-app.put('/api/categories/:id', (req, res) => {
-  const requesterEmail = String(req.headers['x-user-email'] || '').trim().toLowerCase();
-  const db = readDB();
-  const isAdmin = db.admins && db.admins.map(e => e.toLowerCase()).includes(requesterEmail);
-  const isSuper = requesterEmail === 'tructn@vwa.edu.vn';
-  if (!isAdmin && !isSuper) {
-    return res.status(403).json({ success: false, message: 'Chỉ có cán bộ quản trị mới có quyền chỉnh sửa hệ đào tạo.' });
-  }
-
-  const { id } = req.params;
-  const { name, description, isActive } = req.body;
-
-  if (!db.categories || !Array.isArray(db.categories)) {
-    db.categories = [
-      { id: 'ug', name: 'Đại học Chính quy', description: 'Hệ đào tạo Đại học chính quy Học viện Phụ nữ Việt Nam', isActive: true },
-      { id: 'pg', name: 'Thạc sĩ - Sau đại học', description: 'Chương trình đào tạo Sau đại học gồm Thạc sĩ và Tiến sĩ', isActive: true },
-      { id: 'general', name: 'Hỏi đáp & Tổng quan', description: 'Giải đáp thắc mắc tuyển sinh chung toàn trường', isActive: true }
-    ];
-  }
-
-  const catIndex = db.categories.findIndex(c => c.id === id);
-  if (catIndex === -1) {
-    return res.status(404).json({ success: false, message: 'Không tìm thấy hệ đào tạo cần sửa đổi.' });
-  }
-
-  if (name !== undefined) {
-    db.categories[catIndex].name = name.trim();
-  }
-  if (description !== undefined) {
-    db.categories[catIndex].description = description.trim();
-  }
-  if (isActive !== undefined) {
-    db.categories[catIndex].isActive = !!isActive;
-  }
-
-  writeDB(db);
-  res.json({ success: true, message: `Cập nhật hệ đào tạo "${id}" thành công!`, categories: db.categories });
-});
-
-app.delete('/api/categories/:id', (req, res) => {
-  const requesterEmail = String(req.headers['x-user-email'] || '').trim().toLowerCase();
-  const db = readDB();
-  const isAdmin = db.admins && db.admins.map(e => e.toLowerCase()).includes(requesterEmail);
-  const isSuper = requesterEmail === 'tructn@vwa.edu.vn';
-  if (!isAdmin && !isSuper) {
-    return res.status(403).json({ success: false, message: 'Chỉ có cán bộ quản trị mới có quyền xóa hệ đào tạo.' });
-  }
-
-  const { id } = req.params;
-  if (!db.categories || !Array.isArray(db.categories)) {
-    return res.status(404).json({ success: false, message: 'Danh sách hệ đào tạo trống.' });
-  }
-
-  const catIndex = db.categories.findIndex(c => c.id === id);
-  if (catIndex === -1) {
-    return res.status(404).json({ success: false, message: 'Không tìm thấy hệ đào tạo để thực hiện xóa.' });
-  }
-
-  // Prevent deleting core general
-  if (id === 'general') {
-    return res.status(400).json({ success: false, message: 'Không thể xóa hệ đào tạo mặc định hệ thống (general).' });
-  }
-
-  // Safety check: is it in use by docs or faqs?
-  const docsCount = (db.documents || []).filter(doc => doc.category === id).length;
-  const faqsCount = (db.faqs || []).filter(faq => faq.category === id).length;
-
-  if (docsCount > 0 || faqsCount > 0) {
-    return res.status(400).json({
-      success: false,
-      message: `Không thể xóa hệ đào tạo "${id}". Hiện đang có ${docsCount} tài liệu và ${faqsCount} câu hỏi FAQ được gán mã này. Vui lòng chuyển hướng hoặc xóa các tài liệu/FAQ này trước.`
-    });
-  }
-
-  db.categories = db.categories.filter(c => c.id !== id);
-  writeDB(db);
-  res.json({ success: true, message: `Đã xóa hoàn toàn hệ đào tạo "${id}" khỏi hệ thống!`, categories: db.categories });
+  res.json({ success: true, message: `Đã xóa quyền cán bộ của ${targetEmail}.`, admins: db.admins });
 });
 
 // 4. Lịch sử hỏi đáp & feedback
@@ -2225,58 +1086,6 @@ app.post('/api/history/:id/feedback', (req, res) => {
   } else {
     res.status(404).json({ success: false, message: 'Không tìm thấy lịch sử hỏi đáp.' });
   }
-});
-
-// API Endpoints for 1-1 consultations
-app.post('/api/consultations', express.json(), (req, res) => {
-  const { name, phone, email, level, notes } = req.body;
-  if (!name || !phone) {
-    return res.status(400).json({ success: false, message: 'Họ tên và số điện thoại là bắt buộc.' });
-  }
-  const db = readDB();
-  if (!db.consultations) db.consultations = [];
-  const newItem: ConsultationItem = {
-    id: 'consult-' + Date.now(),
-    name,
-    phone,
-    email: email || '',
-    level: level || 'ug',
-    notes: notes || '',
-    status: 'pending',
-    createdAt: new Date().toISOString()
-  };
-  db.consultations.push(newItem);
-  writeDB(db);
-  res.json({ success: true, consultation: newItem });
-});
-
-app.get('/api/consultations', (req, res) => {
-  const db = readDB();
-  res.json(db.consultations || []);
-});
-
-app.post('/api/consultations/:id/status', express.json(), (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body; // 'pending', 'contacted', 'cancelled'
-  const db = readDB();
-  if (!db.consultations) db.consultations = [];
-  const idx = db.consultations.findIndex(c => c.id === id);
-  if (idx !== -1) {
-    db.consultations[idx].status = status;
-    writeDB(db);
-    res.json({ success: true, consultation: db.consultations[idx] });
-  } else {
-    res.status(404).json({ success: false, message: 'Không tìm thấy yêu cầu tư vấn.' });
-  }
-});
-
-app.delete('/api/consultations/:id', (req, res) => {
-  const { id } = req.params;
-  const db = readDB();
-  if (!db.consultations) db.consultations = [];
-  db.consultations = db.consultations.filter(c => c.id !== id);
-  writeDB(db);
-  res.json({ success: true });
 });
 
 // 5. Thống kê & Analytics
@@ -2607,10 +1416,12 @@ function safeParseGeminiResponse(rawText: string): { answer: string; suggested: 
         if (listEnd !== -1 && listEnd > listStart) {
           const listText = textToScan.substring(listStart + 1, listEnd).trim();
           if (listText) {
+            // Trim outer quotes if the entire block starts with " and ends with "
             let cleanedListText = listText;
             if (cleanedListText.startsWith('"') && cleanedListText.endsWith('"')) {
               cleanedListText = cleanedListText.substring(1, cleanedListText.length - 1);
             }
+            // Split by separator of structure: quote, comma, quote (with arbitrary whitespace/newlines)
             const items = cleanedListText.split(/"\s*,\s*"/);
             suggested = items.map(item => 
               item.trim()
@@ -2693,9 +1504,9 @@ function safeParseGeminiResponse(rawText: string): { answer: string; suggested: 
 
     if (answer || suggested.length > 0) {
       console.log("[JSON Regex Recovery] Successfully extracted from broken JSON:", { hasAnswer: !!answer, suggestedCount: suggested.length });
-      return {
-        answer: answer || "Dạ, Học viện chưa tìm thấy thông tin tương thích.",
-        suggested
+      return { 
+        answer: answer || "Dạ, Học viện chưa tìm thấy thông tin tương thích.", 
+        suggested 
       };
     }
     
@@ -2706,16 +1517,9 @@ function safeParseGeminiResponse(rawText: string): { answer: string; suggested: 
 // 6. CHATBOT CORE INTELLIGENT HANDLER
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, activeCategory, history } = req.body; // activeCategory: 'ug', 'pg', 'general', 'all'
+    const { message, activeCategory } = req.body; // activeCategory: 'ug', 'pg', 'general', 'all'
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ success: false, message: 'Message trống hoặc sai định dạng.' });
-    }
-
-    // Build optimized conversation history sliding window of last 6 messages
-    let formattedHistory = '';
-    if (Array.isArray(history) && history.length > 0) {
-      const recentHistory = history.slice(-6);
-      formattedHistory = recentHistory.map(h => `${h.sender === 'user' ? 'Thí sinh' : 'AI Trợ lý'}: ${h.text}`).join('\n');
     }
 
     const db = readDB();
@@ -2726,13 +1530,13 @@ app.post('/api/chat', async (req, res) => {
       aiRoutingMode: 'hybrid',
       faqConfidenceThreshold: 40,
       defaultModel: 'gemini-3.5-flash',
-      aiMaxTokens: 8192,
+      aiMaxTokens: 4000,
       enableCache: true
     };
     const routingMode = config.aiRoutingMode || 'hybrid';
     const confidenceThreshold = config.faqConfidenceThreshold !== undefined ? Number(config.faqConfidenceThreshold) : 40;
     const currentModel = config.defaultModel || 'gemini-3.5-flash';
-    const maxTokens = config.aiMaxTokens !== undefined ? Math.max(Number(config.aiMaxTokens), 8192) : 8192;
+    const maxTokens = config.aiMaxTokens !== undefined ? Math.max(Number(config.aiMaxTokens), 4000) : 4000;
     const isCacheEnabled = config.enableCache !== undefined ? Boolean(config.enableCache) : true;
 
     // 1. Kiểm tra bộ nhớ đệm (Response Cache) - Hoàn toàn miễn phí, phản hồi tức thì
@@ -2782,14 +1586,14 @@ app.post('/api/chat', async (req, res) => {
     if ((routingMode === 'hybrid' && bestFaq && (highestScore * 100 >= confidenceThreshold)) || (routingMode === 'faq_only' && bestFaq && highestScore > 0.15)) {
       console.log(`[Router Match] Đã tìm thấy FAQ tương thích cao (${Math.round(highestScore * 100)}%). Bỏ qua cuộc gọi API tới Gemini để tiết kiệm token!`);
       
-      const replyAnswer = (bestFaq as FAQ).answer;
+      const replyAnswer = bestFaq!.answer;
       const defaultSuggestions = [
         "Xét tuyển bằng phương thức học bạ ra sao?",
         "Học phí hệ chính quy dự kiến năm nay là bao nhiêu?",
         "Chế độ học bổng ưu đãi của trường?"
       ];
       const relatedFaqs = db.faqs
-        .filter(f => f.id !== (bestFaq as FAQ).id)
+        .filter(f => f.id !== bestFaq!.id)
         .slice(0, 3)
         .map(f => f.question);
       const suggestions = relatedFaqs.length >= 3 ? relatedFaqs : [...relatedFaqs, ...defaultSuggestions].slice(0, 3);
@@ -2800,25 +1604,100 @@ app.post('/api/chat', async (req, res) => {
         timestamp: new Date().toISOString(),
         question: message,
         answer: replyAnswer,
-        categoryMatched: activeCategory === 'all' ? 'general' : activeCategory,
+        categoryMatched: bestFaq!.category || 'general',
         feedback: null,
-        tags: ['FAQ-Router'],
-        documentReferenced: ['Câu hỏi thường gặp']
+        tags: bestFaq!.tags || ['FAQ-Matched'],
+        documentReferenced: ['Cơ sở dữ liệu FAQ nội bộ']
       });
       writeDB(db);
+
+      if (isCacheEnabled) {
+        chatCache.set(cacheKey, { answer: replyAnswer, suggested: suggestions, date: Date.now() });
+      }
 
       return res.json({
         success: true,
         id: historyId,
         answer: replyAnswer,
         suggested: suggestions,
-        routingStrategy: 'faq_bypass'
+        routingStrategy: 'local_faq_matched',
+        matchConfidence: highestScore
       });
     }
 
-    // 3. Tìm kiếm ngữ cảnh tài liệu qua RAG thông minh (Đã rút gọn tối ưu chỉ lấy top 4 đoạn để tiết kiệm token)
-    const { context, sources } = searchDocsContext(message, activeCategory || 'all');
+    // 3. Tự động nhận diện phân hệ tuyển sinh
+    let detectedCategory: 'ug' | 'pg' | 'general' | 'unknown' = 'unknown';
+    const msgLower = message.toLowerCase();
+    
+    const ugKeywords = ['đại học', 'học bạ', 'cử nhân', 'ngành luật', 'công nghệ thông tin', 'truyền thông đa phương tiện', 'vpa', 'thpt', 'tốt nghiệp', 'điểm sàn', 'giới và phát triển', 'tâm lý học chính quy'];
+    const pgKeywords = ['thạc sĩ', 'sau đại học', 'cao học', 'tiến sĩ', 'mba', 'luật hiến pháp', 'ngoại ngữ b1', 'thi đầu vào thạc', 'luật hành chính'];
+    const generalKeywords = ['phụ nữ', 'địa chỉ', 'ở đâu', 'hotline', 'nam sinh', 'con gái', 'học viện', 'liên hệ', 'khoa'];
 
+    let ugScore = 0;
+    let pgScore = 0;
+    
+    ugKeywords.forEach(k => { if (msgLower.includes(k)) ugScore += 1; });
+    pgKeywords.forEach(k => { if (msgLower.includes(k)) pgScore += 1; });
+    
+    if (ugScore > pgScore && ugScore > 0) {
+      detectedCategory = 'ug';
+    } else if (pgScore > ugScore && pgScore > 0) {
+      detectedCategory = 'pg';
+    } else if (generalKeywords.some(k => msgLower.includes(k))) {
+      detectedCategory = 'general';
+    }
+
+    // Xác định phân hệ tìm kiếm chính
+    const searchCategory = activeCategory && activeCategory !== 'all' ? activeCategory : (detectedCategory === 'unknown' ? 'all' : detectedCategory);
+
+    // 4. Trích xuất ngữ cảnh từ đề án tuyển sinh tải lên
+    const { context, sources } = searchDocsContext(message, searchCategory);
+
+    // Xử lý nốt trường hợp Offline FAQ-Only (Nếu không khớp FAQ ở phần trên thì sinh câu trả lời ngoại tuyến từ đề án)
+    if (routingMode === 'faq_only') {
+      console.log(`[Router Match] Chế độ Offline hoạt động: Sinh câu trả lời nguyên văn từ các tài liệu lưu trữ cục bộ.`);
+      let answerText = '';
+      let refSources: string[] = [];
+      
+      if (context) {
+        answerText = `Dạ, dưới đây là thông tin tuyển sinh chính thức được trích xuất trực tiếp từ hồ sơ đề án lưu trữ của trường:\n\n${context}`;
+        refSources = sources;
+      } else {
+        answerText = `Dạ, hiện tại Ban tuyển sinh chưa tìm thấy thông tin phù hợp với câu hỏi của bạn.`;
+      }
+      
+      const suggestions = db.faqs.slice(0, 3).map(f => f.question);
+      if (suggestions.length < 3) {
+        suggestions.push("Phương thức xét tuyển học bạ đợt mới ra sao?", "Điều kiện tuyển sinh thạc sĩ gồm những gì?", "Liên hệ Ban Tuyển sinh?");
+      }
+      
+      const historyId = 'hist_faq_only_' + Date.now();
+      db.history.unshift({
+        id: historyId,
+        timestamp: new Date().toISOString(),
+        question: message,
+        answer: answerText,
+        categoryMatched: searchCategory === 'all' ? 'general' : searchCategory,
+        feedback: null,
+        tags: ['Offline-Mode'],
+        documentReferenced: refSources
+      });
+      writeDB(db);
+      
+      if (isCacheEnabled) {
+        chatCache.set(cacheKey, { answer: answerText, suggested: suggestions.slice(0, 3), date: Date.now() });
+      }
+      
+      return res.json({
+        success: true,
+        id: historyId,
+        answer: answerText,
+        suggested: suggestions.slice(0, 3),
+        routingStrategy: 'local_offline_only'
+      });
+    }
+
+    // 5. Kết hợp tìm kiếm FAQ cấp hai nhằm làm giàu prompt ngữ cảnh
     let matchedFaqText = '';
     const relevantFaqs = db.faqs.filter(faq => {
       const qLower = faq.question.toLowerCase();
@@ -2830,18 +1709,7 @@ app.post('/api/chat', async (req, res) => {
         relevantFaqs.map(f => `Hỏi: ${f.question}\nĐáp: ${f.answer}`).join('\n\n');
     }
 
-    // Tự động phân loại luồng danh mục
-    let detectedCategory = activeCategory === 'all' ? 'general' : (activeCategory || 'general');
-    const msgLower = message.toLowerCase();
-    if (detectedCategory === 'general') {
-      if (msgLower.includes('đại học') || msgLower.includes('cử nhân') || msgLower.includes('học bạ thpt')) {
-        detectedCategory = 'ug';
-      } else if (msgLower.includes('thạc sĩ') || msgLower.includes('tiến sĩ') || msgLower.includes('sau đại học') || msgLower.includes('sau đh') || msgLower.includes('cao học')) {
-        detectedCategory = 'pg';
-      }
-    }
-
-    // 4. Sinh phản hồi AI bằng cách gọi Gemini SDK chính thức
+    // 4. Generate AI response using Gemini if available, or fallback gracefully
     let mainAnswer = '';
     let suggestedQuestions: string[] = [];
 
@@ -2862,9 +1730,8 @@ Khi tư vấn và trả lời, hãy áp dụng các nguyên tắc hàng đầu s
 3. GIỚI HẠN THÔNG TIN HOÀN TOÀN TỰ NHIÊN:
    - Nếu trong dữ liệu cung cấp hoàn toàn không đề cập thông tin cần tìm, hãy chân thành giải thích ngắn gọn: "Dạ, hiện tại trong nguồn dữ liệu đề án tuyển sinh chính thức không có thông tin chi tiết về [tên nội dung]."
 
-4. ĐỊNH DẠNG DẠNG BẢNG (TABLE) KHI LIỆT KÊ SỐ LIỆU & TỐI ƯU HÓA TOKEN TRÁNH CẮT XÉN:
+4. ĐỊNH DẠNG DẠNG BẢNG (TABLE) KHI LIỆT KÊ SỐ LIỆU:
    - ĐẶC BIỆT LƯU Ý: Đối với các câu hỏi mang tính chất liệt kê danh sách, chứa số liệu hoặc thống kê (ví dụ: chỉ tiêu tuyển sinh chi tiết từng ngành, danh sách các ngành đào tạo, tổ hợp môn xét tuyển, mức học phí của từng ngành...), bạn BẮT BUỘC phải trình bày dưới dạng BẢNG (Markdown Table) với các cột phân tách rõ ràng (ví dụ: STT, Tên ngành, Mã ngành, Chỉ tiêu, Tổ hợp môn,...).
-   - TỐI ƯU HÓA BẢNG LIỆT KÊ: Để tránh câu trả lời bảng biểu bị lặp rườm rà dẫn đến vượt quá giới hạn độ dài hiển thị (gây lỗi cắt cụt JSON), bạn tuyệt đối KHÔNG lặp lại các cột tẻ nhạt (như cột "Cơ sở" hay "Phương thức tuyển sinh" lặp lại giống hệt nhau ở mọi hàng). Hãy đơn giản hóa bảng, chỉ trình bày các cột cốt lõi nhất: STT, Tên ngành/chương trình, Mã xét tuyển, Chỉ tiêu tuyển sinh, Tổ hợp xét tuyển. Việc thiết kế bảng biểu thanh lịch, súc tích giúp mang lại tỷ lệ hiển thị mỹ thuật tối đa trên thiết bị di động và loại trừ 100% mọi nguy cơ cắt cụt văn bản!
    - Tuyệt đối không viết gạch đầu dòng lê thê hoặc một khối chữ liền mạch khó theo dõi khi thông tin có cấu trúc nhiều thành phần cột. Xuống dòng ngắt đoạn thông thoáng, gọn gàng để tối ưu hóa việc hiển thị.
 
 Định dạng đầu ra:
@@ -3017,7 +1884,7 @@ app.post('/api/school-config', express.json(), (req, res) => {
       aiRoutingMode: newConfig.aiRoutingMode || 'hybrid',
       faqConfidenceThreshold: newConfig.faqConfidenceThreshold !== undefined ? Number(newConfig.faqConfidenceThreshold) : 40,
       defaultModel: newConfig.defaultModel || 'gemini-3.5-flash',
-      aiMaxTokens: newConfig.aiMaxTokens !== undefined ? Number(newConfig.aiMaxTokens) : 8192,
+      aiMaxTokens: newConfig.aiMaxTokens !== undefined ? Number(newConfig.aiMaxTokens) : 4000,
       enableCache: newConfig.enableCache !== undefined ? Boolean(newConfig.enableCache) : true
     };
     
@@ -3072,214 +1939,25 @@ app.post('/api/school-config/logo', upload.single('logo'), (req, res) => {
   }
 });
 
-// Auto-synchronize static RAG files in source tree to db.json on startup
-async function syncStaticRAGDocuments() {
-  console.log('[RAG Syncer] Starting static RAG documents synchronization...');
-  const categories = ['ug', 'pg', 'general'];
-  const db = readDB();
-  let updated = false;
-
-  // 1. Legacy directory scanner (for backward compatibility)
-  for (const cat of categories) {
-    const catDir = path.join(process.cwd(), 'uploads', cat);
-    if (!fs.existsSync(catDir)) {
-      fs.mkdirSync(catDir, { recursive: true });
-      continue;
-    }
-
-    const files = fs.readdirSync(catDir);
-    for (const filename of files) {
-      const ext = filename.split('.').pop()?.toLowerCase() || '';
-      if (!['txt', 'md', 'docx'].includes(ext)) {
-        continue;
-      }
-
-      // Check if this file is already indexed in db.documents
-      const alreadyIndexed = db.documents.some(doc => doc.filename === filename && doc.category === cat);
-      if (alreadyIndexed) {
-        continue;
-      }
-
-      console.log(`[RAG Syncer] Found new static legacy document: ${filename} in category ${cat}. Indexing...`);
-      const filePath = path.join(catDir, filename);
-      let extractedText = '';
-
-      try {
-        if (ext === 'docx') {
-          const buffer = fs.readFileSync(filePath);
-          const result = await mammoth.extractRawText({ buffer });
-          extractedText = result.value;
-        } else {
-          extractedText = fs.readFileSync(filePath, 'utf-8');
-        }
-
-        const chunksCount = extractedText.split(/\n\s*\n/).filter((p: string) => p.trim().length > 30).length || 1;
-        const newDoc: RecruitmentDocument = {
-          id: 'static-doc-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
-          filename,
-          title: filename.replace(/\.[^/.]+$/, "").replace(/_/g, " "),
-          content: extractedText,
-          fileType: ext as any,
-          category: cat as any,
-          uploadDate: new Date().toISOString().split('T')[0],
-          version: '1.0',
-          isLatest: true,
-          isActive: true,
-          chunksCount,
-          dataPath: path.join('uploads', cat, filename),
-          ragPath: filePath.replace(process.cwd() + path.sep, '')
-        };
-
-        // Unmark other latest in the same category just to keep DB consistent
-        db.documents.forEach(doc => {
-          if (doc.category === cat) {
-            doc.isLatest = false;
-          }
-        });
-
-        db.documents.push(newDoc);
-        updated = true;
-        console.log(`[RAG Syncer] Successfully indexed static legacy document: ${filename}`);
-      } catch (err) {
-        console.error(`[RAG Syncer] Failed to index static legacy document ${filename}:`, err);
-      }
-    }
-  }
-
-  // 2. Advanced structured RAG subdirectory (uploads/RAG/<uploadDate>/[category]__[filename].md) scanner
-  const ragRoot = path.join(process.cwd(), 'uploads', 'RAG');
-  if (fs.existsSync(ragRoot)) {
-    try {
-      const dates = fs.readdirSync(ragRoot);
-      for (const dDir of dates) {
-        const fullDDir = path.join(ragRoot, dDir);
-        if (!fs.statSync(fullDDir).isDirectory()) continue;
-        
-        const files = fs.readdirSync(fullDDir);
-        for (const file of files) {
-          if (!file.endsWith('.md')) continue;
-          
-          let category: 'ug' | 'pg' | 'general' = 'general';
-          let originalName = file;
-          
-          if (file.includes('__')) {
-            const parts = file.split('__');
-            const catPart = parts[0];
-            if (['ug', 'pg', 'general'].includes(catPart)) {
-              category = catPart as any;
-              originalName = parts.slice(1).join('__');
-            }
-          }
-          
-          // Check if already indexed in db.documents by checking filename or ragPath
-          const relativeRagPath = path.join('uploads', 'RAG', dDir, file);
-          const alreadyIndexed = db.documents.some(doc => 
-            (doc.ragPath === relativeRagPath) || 
-            (doc.filename === originalName && doc.category === category)
-          );
-          
-          if (alreadyIndexed) continue;
-          
-          console.log(`[RAG Syncer] Found new auto-structured document in RAG folder: ${file} (Date: ${dDir}, Category: ${category}). Indexing...`);
-          const fileContent = fs.readFileSync(path.join(fullDDir, file), 'utf-8');
-          const chunksCount = fileContent.split(/\n\s*\n/).filter((p: string) => p.trim().length > 30).length || 1;
-          
-          const newDoc: RecruitmentDocument = {
-            id: 'static-rag-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
-            filename: originalName,
-            title: originalName.replace(/\.[^/.]+$/, "").replace(/_/g, " "),
-            content: fileContent,
-            fileType: 'md' as any,
-            category: category,
-            uploadDate: dDir,
-            version: '1.0',
-            isLatest: true,
-            isActive: true,
-            chunksCount,
-            dataPath: path.join('uploads', 'Data', dDir, originalName),
-            ragPath: relativeRagPath
-          };
-          
-          db.documents.forEach(doc => {
-            if (doc.category === category) {
-              doc.isLatest = false;
-            }
-          });
-          
-          db.documents.push(newDoc);
-          updated = true;
-          console.log(`[RAG Syncer] Successfully indexed static structured RAG file: ${file}`);
-        }
-      }
-    } catch (err) {
-      console.error('[RAG Syncer] Error during structured RAG sync scan:', err);
-    }
-  }
-
-  if (updated) {
-    writeDB(db);
-    console.log('[RAG Syncer] db.json updated with newly discovered static documents.');
-  } else {
-    console.log('[RAG Syncer] Static RAG documents synchronized. No new documents found.');
-  }
-}
-
 // Setup Vite or build static file serving
 const startExpress = async () => {
-  // Check if we are running the production build from 'dist' or if NODE_ENV is set to production
-  // We check both the process.cwd() and __dirname paths to ensure absolute robustness in Cloud Run container environments
-  const isProduction = 
-    process.env.NODE_ENV === 'production' || 
-    fs.existsSync(path.join(process.cwd(), 'dist', 'index.html')) ||
-    fs.existsSync(path.join(__dirname, 'index.html'));
-
-  if (!isProduction) {
-    try {
-      const { createServer: createViteServer } = await import('vite');
-      const vite = await createViteServer({
-        server: { middlewareMode: true },
-        appType: 'spa',
-      });
-      app.use(vite.middlewares);
-      console.log('[System Boot] Started in DEVELOPMENT mode with dynamic Vite middleware.');
-    } catch (viteErr) {
-      console.warn('[System Boot Fallback] Failed to load Vite development server, fallback to PRODUCTION static file serving:', viteErr);
-      const distPath = fs.existsSync(path.join(process.cwd(), 'dist')) ? path.join(process.cwd(), 'dist') : __dirname;
-      app.use(express.static(distPath));
-      app.get('*', (req, res) => {
-        const indexPath = fs.existsSync(path.join(distPath, 'index.html')) ? path.join(distPath, 'index.html') : path.join(process.cwd(), 'dist', 'index.html');
-        res.sendFile(indexPath);
-      });
-    }
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
   } else {
-    const distPath = fs.existsSync(path.join(process.cwd(), 'dist')) ? path.join(process.cwd(), 'dist') : __dirname;
+    const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
-      const indexPath = fs.existsSync(path.join(distPath, 'index.html')) ? path.join(distPath, 'index.html') : path.join(process.cwd(), 'dist', 'index.html');
-      res.sendFile(indexPath);
+      res.sendFile(path.join(distPath, 'index.html'));
     });
-    console.log('[System Boot] Started in PRODUCTION mode serving static files from:', distPath);
   }
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`[VWA Admissions Chatbot Server] running on http://0.0.0.0:${PORT}`);
-    
-    // Trigger background sync tasks AFTER starting to listen to prevent port-binding timeouts during container boot
-    console.log('[System Boot] Port bound successfully. Initiating background sync programs...');
-    syncStaticRAGDocuments()
-      .then(() => {
-        console.log('[System Boot] Static RAG files synchronized successfully in background.');
-        return syncFirestoreToLocal();
-      })
-      .then(() => {
-        console.log('[System Boot] Cloud Firestore data cache synchronized in background.');
-      })
-      .catch((err) => {
-        console.error('[System Boot Error] Background initial sync failed:', err);
-      });
   });
 };
 
 startExpress();
-
-export default app;
