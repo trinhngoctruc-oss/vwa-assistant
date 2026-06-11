@@ -3215,7 +3215,10 @@ async function syncStaticRAGDocuments() {
 
 // Setup Vite or build static file serving
 const startExpress = async () => {
-  if (process.env.NODE_ENV !== 'production') {
+  // Check if we are running the production build from 'dist' or if NODE_ENV is set to production
+  const isProduction = process.env.NODE_ENV === 'production' || fs.existsSync(path.join(process.cwd(), 'dist', 'index.html'));
+
+  if (!isProduction) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
