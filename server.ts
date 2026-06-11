@@ -16,7 +16,7 @@ import multer from 'multer';
 import mammoth from 'mammoth';
 import { RecruitmentDocument, FAQ, HistoryItem, RecruitmentStats, SchoolConfig } from './src/types.ts';
 import { initializeApp as initializeFirebase } from 'firebase/app';
-import { getFirestore as getFirebaseFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore';
+import { getFirestore as getFirebaseFirestore, initializeFirestore, setLogLevel, doc, getDoc, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore';
 
 // OAuth Configuration
 passport.use(new GoogleStrategy({
@@ -65,7 +65,15 @@ if (fs.existsSync(firebaseConfigPath)) {
     const config = JSON.parse(fs.readFileSync(firebaseConfigPath, 'utf-8'));
     console.log('[Firebase Init] Loading config:', JSON.stringify(config, null, 2));
     const firebaseApp = initializeFirebase(config);
-    firestoreDb = getFirebaseFirestore(firebaseApp, config.firestoreDatabaseId);
+    
+    // Set level to 'error' to silent transient stream connection warnings
+    setLogLevel('error');
+    
+    // Use initializeFirestore with experimentalForceLongPolling to prevent WebSocket/gRPC stream drops on container environment
+    firestoreDb = config.firestoreDatabaseId 
+      ? initializeFirestore(firebaseApp, { experimentalForceLongPolling: true }, config.firestoreDatabaseId)
+      : initializeFirestore(firebaseApp, { experimentalForceLongPolling: true });
+      
     console.log('[Firebase Init] Khởi tạo Firebase Firestore thành công từ file config! Database ID:', config.firestoreDatabaseId || 'default');
   } catch (err) {
     console.error('[Firebase Init Error] Không thể kết nối Firestore:', err);
