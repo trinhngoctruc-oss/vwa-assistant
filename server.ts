@@ -6,6 +6,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import 'dotenv/config';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import multer from 'multer';
@@ -19,9 +20,14 @@ const PORT = 3000;
 const DB_FILE = path.join(process.cwd(), 'db.json');
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
 
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
+const DATA_DIR = path.join(UPLOAD_DIR, 'Data');
+const IMAGE_DIR = path.join(UPLOAD_DIR, 'Image');
+const RAG_DIR = path.join(UPLOAD_DIR, 'RAG');
+
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+if (!fs.existsSync(IMAGE_DIR)) fs.mkdirSync(IMAGE_DIR, { recursive: true });
+if (!fs.existsSync(RAG_DIR)) fs.mkdirSync(RAG_DIR, { recursive: true });
 
 // Multer storage
 const upload = multer({
@@ -101,7 +107,14 @@ async function generateContentWithRetry(
         errString.includes('rate limit') ||
         errString.includes('high demand') ||
         errString.includes('temporary') ||
-        errString.includes('timeout') ||
+        errString.toLowerCase().includes('timeout') ||
+        errString.toLowerCase().includes('fetch failed') ||
+        errString.toLowerCase().includes('undici') ||
+        errString.toLowerCase().includes('socket') ||
+        errString.toLowerCase().includes('typeerror') ||
+        errString.toLowerCase().includes('network') ||
+        errString.includes('ECONNRESET') ||
+        errString.includes('ETIMEDOUT') ||
         (err.status && [503, 500, 429].includes(err.status));
 
       if (!isRetryable || attempt >= maxRetries) {
@@ -116,13 +129,34 @@ async function generateContentWithRetry(
   }
 }
 
+interface TrainingCategory {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+}
+
+interface ConsultationItem {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  level: 'ug' | 'pg'; // ug = Đại học, pg = SĐH
+  notes?: string;
+  status: 'pending' | 'contacted' | 'cancelled';
+  createdAt: string;
+}
+
 // Interfaces for our DB structure
 interface DB {
   documents: RecruitmentDocument[];
   faqs: FAQ[];
   history: HistoryItem[];
   admins: string[];
+  adminPermissions?: Record<string, string[]>;
   schoolConfig?: SchoolConfig;
+  categories?: TrainingCategory[];
+  consultations?: ConsultationItem[];
 }
 
 // Initial Database Setup if empty
@@ -213,6 +247,28 @@ function readDB(): DB {
         } catch (writeErr) {
           console.error('Không ghi được Cost fields bổ sung vào schoolConfig:', writeErr);
         }
+      }
+    }
+
+    if (!parsed.categories || !Array.isArray(parsed.categories)) {
+      parsed.categories = [
+        { id: 'ug', name: 'Đại học Chính quy', description: 'Hệ đào tạo Đại học chính quy Học viện Phụ nữ Việt Nam', isActive: true },
+        { id: 'pg', name: 'Thạc sĩ - Sau đại học', description: 'Chương trình đào tạo Sau đại học gồm Thạc sĩ và Tiến sĩ', isActive: true },
+        { id: 'general', name: 'Hỏi đáp & Tổng quan', description: 'Giải đáp thắc mắc tuyển sinh chung toàn trường', isActive: true }
+      ];
+      try {
+        fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf-8');
+      } catch (writeErr) {
+        console.error('Không cập nhật được categories mặc định vào DB:', writeErr);
+      }
+    }
+
+    if (!parsed.consultations || !Array.isArray(parsed.consultations)) {
+      parsed.consultations = [];
+      try {
+        fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf-8');
+      } catch (writeErr) {
+        console.error('Không cập nhật được consultations mặc định vào DB:', writeErr);
       }
     }
 
@@ -328,10 +384,26 @@ function searchDocsContext(query: string, category: 'ug' | 'pg' | 'general' | 'a
 
   // Grouped by document to easily get surrounding window paragraphs (headings/neighboring rows)
   const docParagraphsMap = new Map<string, string[]>();
+  const docLiveContentMap = new Map<string, string>();
   
   for (const doc of activeDocs) {
+    // Read live content directly from physical files under uploads/RAG/ matching user rules 3 & 4
+    let docContent = doc.content;
+    if (doc.ragPath) {
+      const fullPath = path.isAbsolute(doc.ragPath) ? doc.ragPath : path.join(process.cwd(), doc.ragPath);
+      if (fs.existsSync(fullPath)) {
+        try {
+          docContent = fs.readFileSync(fullPath, 'utf-8');
+          console.log(`[RAG Live Disk Match] Read fresh content from ${fullPath}`);
+        } catch (err) {
+          console.error(`[RAG Live Disk Match] Error reading RAG path for ${doc.title}:`, err);
+        }
+      }
+    }
+    docLiveContentMap.set(doc.id, docContent);
+
     // Split by double newline or single newline to keep table row structures
-    const paragraphs = doc.content
+    const paragraphs = docContent
       .split(/\n+/)
       .map(p => p.trim())
       .filter(p => p.length > 5); // keep short headings/rows too for complete context
@@ -463,14 +535,17 @@ function searchDocsContext(query: string, category: 'ug' | 'pg' | 'general' | 'a
   });
 
   // Calculate total letters of all doc content loaded to see if full-document injection is possible
-  const totalContentLength = activeDocs.reduce((acc, d) => acc + d.content.length, 0);
+  const totalContentLength = activeDocs.reduce((acc, d) => acc + (docLiveContentMap.get(d.id) || d.content).length, 0);
   
   let finalContext = contextSegments.join('\n\n---\n\n');
 
   // If the total characters of all active documents combined is reasonable (< 150,000 characters which is approx 25,000 words),
   // we append the FULL original text of each active document as well. This makes certain that the model CANNOT lose any details!
   if (totalContentLength < 150000) {
-    const fullDocsText = activeDocs.map(d => `=== TOÀN VĂN TÀI LIỆU TUYỂN SINH HOẠT ĐỘNG: "${d.title}" ===\n${d.content}\n=== KẾT THÚC TOÀN VĂN: "${d.title}" ===`).join('\n\n');
+    const fullDocsText = activeDocs.map(d => {
+      const liveText = docLiveContentMap.get(d.id) || d.content;
+      return `=== TOÀN VĂN TÀI LIỆU TUYỂN SINH HOẠT ĐỘNG: "${d.title}" ===\n${liveText}\n=== KẾT THÚC TOÀN VĂN: "${d.title}" ===`;
+    }).join('\n\n');
     finalContext = `[KẾT QUẢ TÌM BIỂU ĐOẠN TRÍCH CHI TIẾT TỪ CHUNK RAG]:\n${finalContext}\n\n======================================================\n\n[DỮ LIỆU TOÀN VĂN TRÍCH XUẤT ĐẦY ĐỦ CỦA CÁC FILE ĐÃ TẢI LÊN (Bắt buộc dùng dữ liệu chính thức này để rà soát chi tiết chính xác 100%)]:\n${fullDocsText}`;
   }
 
@@ -537,6 +612,41 @@ app.post('/api/documents/:id/toggle', (req, res) => {
   }
 });
 
+// Helper to manage and create structured subfolders under /uploads
+function getStructuredUploadPaths(filename: string, category: string, uploadDate?: string) {
+  const dateStr = uploadDate || new Date().toISOString().split('T')[0];
+  const cat = category || 'general';
+  
+  const dataDir = path.join(process.cwd(), 'uploads', 'Data', dateStr);
+  const imageDir = path.join(process.cwd(), 'uploads', 'Image', dateStr);
+  const ragDir = path.join(process.cwd(), 'uploads', 'RAG', dateStr);
+  
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  if (!fs.existsSync(imageDir)) fs.mkdirSync(imageDir, { recursive: true });
+  if (!fs.existsSync(ragDir)) fs.mkdirSync(ragDir, { recursive: true });
+  
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  const baseName = filename.replace(/\.[^/.]+$/, "");
+  
+  const dataPath = path.join(dataDir, filename);
+  // Structured file name for self-description: [category]__[basename].md
+  const ragPath = path.join(ragDir, `${cat}__${baseName}.md`);
+  
+  // Return relative paths for DB index (so they work on any environment/container cold start)
+  const relativeDataPath = path.join('uploads', 'Data', dateStr, filename);
+  const relativeRagPath = path.join('uploads', 'RAG', dateStr, `${cat}__${baseName}.md`);
+  
+  return { 
+    dataDir, 
+    imageDir, 
+    ragDir, 
+    dataPath, 
+    ragPath,
+    relativeDataPath,
+    relativeRagPath
+  };
+}
+
 // Upload endpoint
 app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
   try {
@@ -547,15 +657,26 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
     const { title, category, version } = req.body;
     const filename = req.file.originalname;
     const ext = filename.split('.').pop()?.toLowerCase() || '';
+    const mimeType = req.file.mimetype;
 
-    if (!['docx', 'pdf', 'xlsx', 'xls', 'txt'].includes(ext)) {
-      return res.status(400).json({ success: false, message: 'Chỉ hỗ trợ file Word (.docx), PDF (.pdf), Excel (.xlsx) và Text (.txt).' });
+    const allowedExtensions = ['docx', 'pdf', 'xlsx', 'xls', 'txt', 'png', 'jpg', 'jpeg', 'webp'];
+    if (!allowedExtensions.includes(ext)) {
+      return res.status(400).json({ success: false, message: 'Chỉ hỗ trợ file Word (.docx), PDF (.pdf), Excel (.xlsx/.xls), Text (.txt) và Hình ảnh (.png, .jpg, .jpeg, .webp).' });
     }
+
+    const docCategory = category || 'general';
+    const uploadDateStr = new Date().toISOString().split('T')[0];
+    
+    // Resolve structured paths
+    const paths = getStructuredUploadPaths(filename, docCategory, uploadDateStr);
 
     let extractedText = '';
 
-    // Upgraded DOCX RAG-optimized extraction
+    // Choose parsing pipeline based on file type
     if (ext === 'docx') {
+      // 1. Double save original file
+      fs.writeFileSync(paths.dataPath, req.file.buffer);
+
       const htmlResult = await mammoth.convertToHtml({ buffer: req.file.buffer });
       const htmlContent = htmlResult.value;
 
@@ -594,7 +715,7 @@ CHÚ Ý QUAN TRỌNG:
           });
           extractedText = cleanMarkdownText(aiRes.text || 'Trống');
         } catch (err: any) {
-          console.error("Lỗi khi dùng Gemini phân tích DOCX HTML, chuyển sang trích xuất raw text thô", err);
+          console.error("Lỗi khi dùng Gemini phân tích DOCX HTML, chuyển sang trích xuất thô", err);
           const result = await mammoth.extractRawText({ buffer: req.file.buffer });
           extractedText = result.value;
         }
@@ -603,16 +724,58 @@ CHÚ Ý QUAN TRỌNG:
         extractedText = result.value;
       }
     } else if (ext === 'txt') {
+      // txt raw direct path write
+      fs.writeFileSync(paths.dataPath, req.file.buffer);
       extractedText = req.file.buffer.toString('utf-8');
-    } else {
-      // PDF or Excel - utilize Gemini to read accurately with RAG-optimized prompts
+    } else if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
+      // Save to Image as well as Data as requested by User Goal 4
+      fs.writeFileSync(paths.dataPath, req.file.buffer);
+      const destImagePath = path.join(paths.imageDir, filename);
+      fs.writeFileSync(destImagePath, req.file.buffer);
+      console.log(`[Upload] Image physically saved additionally to ${destImagePath}`);
+
       const gemini = getGeminiClient();
       if (gemini) {
         try {
-          const mimeType = ext === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-          const filePart = {
+          const imagePart = {
             inlineData: {
               mimeType: mimeType,
+              data: req.file.buffer.toString('base64'),
+            },
+          };
+          
+          const parsePrompt = `Bạn là một Chuyên gia phân tích dữ liệu tuyển sinh Học viện Phụ nữ Việt Nam và lập trình hệ thống RAG (Retrieval-Augmented Generation) cao cấp.
+Bạn nhận được một hình ảnh tuyển sinh đính kèm (chứa thông tin, sơ đồ, bảng chỉ tiêu hoặc biểu phí nhập học...).
+Nhiệm vụ của bạn: Hãy phân tích kỹ hình ảnh này, đọc tất cả văn bản (OCR) và mô tả/chuyển hóa lại toàn bộ thông tin có trong ảnh thành văn bản dạng Markdown chất lượng cao, tối ưu tuyệt đối cho công cụ tìm kiếm và RAG:
+
+1. Trích xuất CHÍNH XÁC 100% tất cả các con số, tên gọi, bảng dữ liệu biểu phí hay chỉ tiêu ngành.
+2. Nếu có bảng biểu hoặc ô trộn dòng/cột: Bạn phải vẽ lại bảng bằng Markdown, điền đầy đủ các ô, nhân bản giá trị ô trộn để dòng nào cũng có ngữ cảnh hoàn chỉnh.
+3. Kèm theo phần diễn giải chi tiết dạng danh sách văn xuôi cho từng hàng của bảng hoặc phần nội dung của ảnh để RAG phân đoạn hiệu quả nhất. Không làm mất bất kỳ một thông tin hay số liệu nào trong ảnh.
+4. Trả về đúng nội dung văn bản Markdown kết quả, không thêm bất kỳ lời dẫn, lời chào hay giải thích gì bên ngoài.`;
+
+          const aiRes = await generateContentWithRetry(gemini, {
+            model: 'gemini-3.5-flash',
+            contents: [imagePart, { text: parsePrompt }]
+          });
+          extractedText = cleanMarkdownText(aiRes.text || 'Trống');
+        } catch (err: any) {
+          console.error("Gemini OCR parser failed, falling back to basic metadata placeholder", err);
+          extractedText = `Hình ảnh tuyển sinh gốc: ${filename}\nTải lên ngày: ${uploadDateStr}\nPhân hệ: ${docCategory}`;
+        }
+      } else {
+        extractedText = `Hình ảnh tuyển sinh gốc: ${filename}\nTải lên ngày: ${uploadDateStr}\nPhân hệ: ${docCategory}`;
+      }
+    } else {
+      // PDF or Excel
+      fs.writeFileSync(paths.dataPath, req.file.buffer);
+
+      const gemini = getGeminiClient();
+      if (gemini) {
+        try {
+          const targetMimeType = ext === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+          const filePart = {
+            inlineData: {
+              mimeType: targetMimeType,
               data: req.file.buffer.toString('base64'),
             },
           };
@@ -649,6 +812,10 @@ Hãy bảo đảm giữ nguyên các con số chính xác 100% (học phí, ch�
       }
     }
 
+    // Save final processed RAG text to disk matching user goal 2 & 4
+    fs.writeFileSync(paths.ragPath, extractedText, 'utf-8');
+    console.log(`[Upload] Processed RAG text saved to ${paths.ragPath}`);
+
     // Split paragraphs count
     const chunksCount = extractedText.split(/\n\s*\n/).filter(p => p.trim().length > 30).length || 1;
 
@@ -658,12 +825,14 @@ Hãy bảo đảm giữ nguyên các con số chính xác 100% (học phí, ch�
       title: title || filename,
       content: extractedText,
       fileType: (ext === 'xls' ? 'xlsx' : ext) as any,
-      category: (category || 'general') as any,
-      uploadDate: new Date().toISOString().split('T')[0],
+      category: docCategory as any,
+      uploadDate: uploadDateStr,
       version: version || '1.0',
       isLatest: true,
       isActive: true,
       chunksCount,
+      dataPath: paths.relativeDataPath,
+      ragPath: paths.relativeRagPath
     };
 
     const db = readDB();
@@ -975,19 +1144,22 @@ app.post('/api/auth/verify', (req, res) => {
       user: {
         email: normalized,
         role: 'superadmin',
-        name: 'Master Admin Trực'
+        name: 'Master Admin Trực',
+        categories: ['ug', 'pg', 'general']
       }
     });
   }
 
   const isAdmin = db.admins && db.admins.map(e => e.toLowerCase()).includes(normalized);
   if (isAdmin) {
+    const cats = (db.adminPermissions && db.adminPermissions[normalized]) || ['ug', 'pg', 'general'];
     return res.json({
       success: true,
       user: {
         email: normalized,
         role: 'admin',
-        name: normalized.split('@')[0]
+        name: normalized.split('@')[0],
+        categories: cats
       }
     });
   }
@@ -1009,14 +1181,21 @@ app.get('/api/admins', (req, res) => {
   }
 
   const db = readDB();
-  // Ensure we list it nicely
   const adminsList = db.admins || ['tructn@vwa.edu.vn'];
-  res.json({ success: true, admins: adminsList });
+  const permissions = db.adminPermissions || {};
+
+  const adminsWithPerms = adminsList.map(email => {
+    const lowEmail = email.toLowerCase();
+    const cats = permissions[lowEmail] || ['ug', 'pg', 'general'];
+    return { email, categories: cats };
+  });
+
+  res.json({ success: true, admins: adminsWithPerms });
 });
 
 app.post('/api/admins', (req, res) => {
   const requesterEmail = String(req.body.creatorEmail || '').trim().toLowerCase();
-  const { newAdminEmail } = req.body;
+  const { newAdminEmail, categories } = req.body;
 
   if (requesterEmail !== 'tructn@vwa.edu.vn') {
     return res.status(403).json({ success: false, message: 'Chỉ có tài khoản quản trị tối cao (tructn@vwa.edu.vn) mới có quyền cấp phép.' });
@@ -1041,9 +1220,55 @@ app.post('/api/admins', (req, res) => {
   }
 
   db.admins.push(targetEmail);
+
+  if (!db.adminPermissions) {
+    db.adminPermissions = {};
+  }
+  db.adminPermissions[targetEmail] = Array.isArray(categories) && categories.length > 0 ? categories : ['ug', 'pg', 'general'];
+
   writeDB(db);
 
-  res.json({ success: true, message: `Thêm cán bộ ${targetEmail} thành công!`, admins: db.admins });
+  const permissions = db.adminPermissions || {};
+  const adminsWithPerms = db.admins.map(email => {
+    const lowEmail = email.toLowerCase();
+    const cats = permissions[lowEmail] || ['ug', 'pg', 'general'];
+    return { email, categories: cats };
+  });
+
+  res.json({ success: true, message: `Thêm cán bộ ${targetEmail} thành công và phân phối phạm vi quản lý!`, admins: adminsWithPerms });
+});
+
+app.put('/api/admins/:email/permissions', (req, res) => {
+  const requesterEmail = String(req.headers['x-user-email'] || '').trim().toLowerCase();
+  const { email } = req.params;
+  const { categories } = req.body;
+
+  if (requesterEmail !== 'tructn@vwa.edu.vn') {
+    return res.status(403).json({ success: false, message: 'Chỉ có tài khoản quản trị tối cao (tructn@vwa.edu.vn) mới có quyền cập nhật phân quyền.' });
+  }
+
+  const targetEmail = String(email || '').trim().toLowerCase();
+  const db = readDB();
+  
+  if (!db.admins || !db.admins.map(e => e.toLowerCase()).includes(targetEmail)) {
+    return res.status(404).json({ success: false, message: 'Không tìm thấy cán bộ để cập nhật quyền.' });
+  }
+
+  if (!db.adminPermissions) {
+    db.adminPermissions = {};
+  }
+
+  db.adminPermissions[targetEmail] = Array.isArray(categories) ? categories : [];
+  writeDB(db);
+
+  const permissions = db.adminPermissions || {};
+  const adminsWithPerms = db.admins.map(email => {
+    const lowEmail = email.toLowerCase();
+    const cats = permissions[lowEmail] || ['ug', 'pg', 'general'];
+    return { email, categories: cats };
+  });
+
+  res.json({ success: true, message: `Cập nhật phân quyền cho ${targetEmail} thành công!`, admins: adminsWithPerms });
 });
 
 app.delete('/api/admins/:email', (req, res) => {
@@ -1062,10 +1287,155 @@ app.delete('/api/admins/:email', (req, res) => {
   const db = readDB();
   if (db.admins) {
     db.admins = db.admins.filter(e => e.toLowerCase() !== targetEmail);
+    if (db.adminPermissions) {
+      delete db.adminPermissions[targetEmail];
+    }
     writeDB(db);
   }
 
-  res.json({ success: true, message: `Đã xóa quyền cán bộ của ${targetEmail}.`, admins: db.admins });
+  const permissions = db.adminPermissions || {};
+  const adminsWithPerms = (db.admins || ['tructn@vwa.edu.vn']).map(email => {
+    const lowEmail = email.toLowerCase();
+    const cats = permissions[lowEmail] || ['ug', 'pg', 'general'];
+    return { email, categories: cats };
+  });
+
+  res.json({ success: true, message: `Đã xóa quyền cán bộ của ${targetEmail}.`, admins: adminsWithPerms });
+});
+
+// Category/System training management endpoints
+app.get('/api/categories', (req, res) => {
+  const db = readDB();
+  if (!db.categories || !Array.isArray(db.categories)) {
+    db.categories = [
+      { id: 'ug', name: 'Đại học Chính quy', description: 'Hệ đào tạo Đại học chính quy Học viện Phụ nữ Việt Nam', isActive: true },
+      { id: 'pg', name: 'Thạc sĩ - Sau đại học', description: 'Chương trình đào tạo Sau đại học gồm Thạc sĩ và Tiến sĩ', isActive: true },
+      { id: 'general', name: 'Hỏi đáp & Tổng quan', description: 'Giải đáp thắc mắc tuyển sinh chung toàn trường', isActive: true }
+    ];
+    writeDB(db);
+  }
+  res.json({ success: true, categories: db.categories });
+});
+
+app.post('/api/categories', (req, res) => {
+  const requesterEmail = String(req.headers['x-user-email'] || '').trim().toLowerCase();
+  const db = readDB();
+  const isAdmin = db.admins && db.admins.map(e => e.toLowerCase()).includes(requesterEmail);
+  const isSuper = requesterEmail === 'tructn@vwa.edu.vn';
+  if (!isAdmin && !isSuper) {
+    return res.status(403).json({ success: false, message: 'Chỉ có cán bộ quản trị mới có quyền thêm hệ đào tạo mới.' });
+  }
+
+  const { id, name, description, isActive } = req.body;
+  if (!id || !name) {
+    return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ Mã hệ (ID) và Tên hệ đào tạo.' });
+  }
+
+  const code = id.trim().toLowerCase();
+  if (!/^[a-z0-9_-]+$/.test(code)) {
+    return res.status(400).json({ success: false, message: 'Mã hệ đào tạo chỉ được chứa chữ thường không dấu, số, dấu gạch dưới hoặc gạch ngang.' });
+  }
+
+  if (!db.categories || !Array.isArray(db.categories)) {
+    db.categories = [
+      { id: 'ug', name: 'Đại học Chính quy', description: 'Hệ đào tạo Đại học chính quy Học viện Phụ nữ Việt Nam', isActive: true },
+      { id: 'pg', name: 'Thạc sĩ - Sau đại học', description: 'Chương trình đào tạo Sau đại học gồm Thạc sĩ và Tiến sĩ', isActive: true },
+      { id: 'general', name: 'Hỏi đáp & Tổng quan', description: 'Giải đáp thắc mắc tuyển sinh chung toàn trường', isActive: true }
+    ];
+  }
+
+  if (db.categories.some(c => c.id === code)) {
+    return res.status(400).json({ success: false, message: `Mã hệ đào tạo "${code}" đã tồn tại trên hệ thống.` });
+  }
+
+  db.categories.push({
+    id: code,
+    name: name.trim(),
+    description: (description || '').trim(),
+    isActive: isActive !== false
+  });
+
+  writeDB(db);
+  res.json({ success: true, message: `Thêm hệ đào tạo "${name.trim()}" thành công!`, categories: db.categories });
+});
+
+app.put('/api/categories/:id', (req, res) => {
+  const requesterEmail = String(req.headers['x-user-email'] || '').trim().toLowerCase();
+  const db = readDB();
+  const isAdmin = db.admins && db.admins.map(e => e.toLowerCase()).includes(requesterEmail);
+  const isSuper = requesterEmail === 'tructn@vwa.edu.vn';
+  if (!isAdmin && !isSuper) {
+    return res.status(403).json({ success: false, message: 'Chỉ có cán bộ quản trị mới có quyền chỉnh sửa hệ đào tạo.' });
+  }
+
+  const { id } = req.params;
+  const { name, description, isActive } = req.body;
+
+  if (!db.categories || !Array.isArray(db.categories)) {
+    db.categories = [
+      { id: 'ug', name: 'Đại học Chính quy', description: 'Hệ đào tạo Đại học chính quy Học viện Phụ nữ Việt Nam', isActive: true },
+      { id: 'pg', name: 'Thạc sĩ - Sau đại học', description: 'Chương trình đào tạo Sau đại học gồm Thạc sĩ và Tiến sĩ', isActive: true },
+      { id: 'general', name: 'Hỏi đáp & Tổng quan', description: 'Giải đáp thắc mắc tuyển sinh chung toàn trường', isActive: true }
+    ];
+  }
+
+  const catIndex = db.categories.findIndex(c => c.id === id);
+  if (catIndex === -1) {
+    return res.status(404).json({ success: false, message: 'Không tìm thấy hệ đào tạo cần sửa đổi.' });
+  }
+
+  if (name !== undefined) {
+    db.categories[catIndex].name = name.trim();
+  }
+  if (description !== undefined) {
+    db.categories[catIndex].description = description.trim();
+  }
+  if (isActive !== undefined) {
+    db.categories[catIndex].isActive = !!isActive;
+  }
+
+  writeDB(db);
+  res.json({ success: true, message: `Cập nhật hệ đào tạo "${id}" thành công!`, categories: db.categories });
+});
+
+app.delete('/api/categories/:id', (req, res) => {
+  const requesterEmail = String(req.headers['x-user-email'] || '').trim().toLowerCase();
+  const db = readDB();
+  const isAdmin = db.admins && db.admins.map(e => e.toLowerCase()).includes(requesterEmail);
+  const isSuper = requesterEmail === 'tructn@vwa.edu.vn';
+  if (!isAdmin && !isSuper) {
+    return res.status(403).json({ success: false, message: 'Chỉ có cán bộ quản trị mới có quyền xóa hệ đào tạo.' });
+  }
+
+  const { id } = req.params;
+  if (!db.categories || !Array.isArray(db.categories)) {
+    return res.status(404).json({ success: false, message: 'Danh sách hệ đào tạo trống.' });
+  }
+
+  const catIndex = db.categories.findIndex(c => c.id === id);
+  if (catIndex === -1) {
+    return res.status(404).json({ success: false, message: 'Không tìm thấy hệ đào tạo để thực hiện xóa.' });
+  }
+
+  // Prevent deleting core general
+  if (id === 'general') {
+    return res.status(400).json({ success: false, message: 'Không thể xóa hệ đào tạo mặc định hệ thống (general).' });
+  }
+
+  // Safety check: is it in use by docs or faqs?
+  const docsCount = (db.documents || []).filter(doc => doc.category === id).length;
+  const faqsCount = (db.faqs || []).filter(faq => faq.category === id).length;
+
+  if (docsCount > 0 || faqsCount > 0) {
+    return res.status(400).json({
+      success: false,
+      message: `Không thể xóa hệ đào tạo "${id}". Hiện đang có ${docsCount} tài liệu và ${faqsCount} câu hỏi FAQ được gán mã này. Vui lòng chuyển hướng hoặc xóa các tài liệu/FAQ này trước.`
+    });
+  }
+
+  db.categories = db.categories.filter(c => c.id !== id);
+  writeDB(db);
+  res.json({ success: true, message: `Đã xóa hoàn toàn hệ đào tạo "${id}" khỏi hệ thống!`, categories: db.categories });
 });
 
 // 4. Lịch sử hỏi đáp & feedback
@@ -1086,6 +1456,58 @@ app.post('/api/history/:id/feedback', (req, res) => {
   } else {
     res.status(404).json({ success: false, message: 'Không tìm thấy lịch sử hỏi đáp.' });
   }
+});
+
+// API Endpoints for 1-1 consultations
+app.post('/api/consultations', express.json(), (req, res) => {
+  const { name, phone, email, level, notes } = req.body;
+  if (!name || !phone) {
+    return res.status(400).json({ success: false, message: 'Họ tên và số điện thoại là bắt buộc.' });
+  }
+  const db = readDB();
+  if (!db.consultations) db.consultations = [];
+  const newItem: ConsultationItem = {
+    id: 'consult-' + Date.now(),
+    name,
+    phone,
+    email: email || '',
+    level: level || 'ug',
+    notes: notes || '',
+    status: 'pending',
+    createdAt: new Date().toISOString()
+  };
+  db.consultations.push(newItem);
+  writeDB(db);
+  res.json({ success: true, consultation: newItem });
+});
+
+app.get('/api/consultations', (req, res) => {
+  const db = readDB();
+  res.json(db.consultations || []);
+});
+
+app.post('/api/consultations/:id/status', express.json(), (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body; // 'pending', 'contacted', 'cancelled'
+  const db = readDB();
+  if (!db.consultations) db.consultations = [];
+  const idx = db.consultations.findIndex(c => c.id === id);
+  if (idx !== -1) {
+    db.consultations[idx].status = status;
+    writeDB(db);
+    res.json({ success: true, consultation: db.consultations[idx] });
+  } else {
+    res.status(404).json({ success: false, message: 'Không tìm thấy yêu cầu tư vấn.' });
+  }
+});
+
+app.delete('/api/consultations/:id', (req, res) => {
+  const { id } = req.params;
+  const db = readDB();
+  if (!db.consultations) db.consultations = [];
+  db.consultations = db.consultations.filter(c => c.id !== id);
+  writeDB(db);
+  res.json({ success: true });
 });
 
 // 5. Thống kê & Analytics
@@ -1939,8 +2361,163 @@ app.post('/api/school-config/logo', upload.single('logo'), (req, res) => {
   }
 });
 
+// Auto-synchronize static RAG files in source tree to db.json on startup
+async function syncStaticRAGDocuments() {
+  console.log('[RAG Syncer] Starting static RAG documents synchronization...');
+  const categories = ['ug', 'pg', 'general'];
+  const db = readDB();
+  let updated = false;
+
+  // 1. Legacy directory scanner (for backward compatibility)
+  for (const cat of categories) {
+    const catDir = path.join(process.cwd(), 'uploads', cat);
+    if (!fs.existsSync(catDir)) {
+      fs.mkdirSync(catDir, { recursive: true });
+      continue;
+    }
+
+    const files = fs.readdirSync(catDir);
+    for (const filename of files) {
+      const ext = filename.split('.').pop()?.toLowerCase() || '';
+      if (!['txt', 'md', 'docx'].includes(ext)) {
+        continue;
+      }
+
+      // Check if this file is already indexed in db.documents
+      const alreadyIndexed = db.documents.some(doc => doc.filename === filename && doc.category === cat);
+      if (alreadyIndexed) {
+        continue;
+      }
+
+      console.log(`[RAG Syncer] Found new static legacy document: ${filename} in category ${cat}. Indexing...`);
+      const filePath = path.join(catDir, filename);
+      let extractedText = '';
+
+      try {
+        if (ext === 'docx') {
+          const buffer = fs.readFileSync(filePath);
+          const result = await mammoth.extractRawText({ buffer });
+          extractedText = result.value;
+        } else {
+          extractedText = fs.readFileSync(filePath, 'utf-8');
+        }
+
+        const chunksCount = extractedText.split(/\n\s*\n/).filter((p: string) => p.trim().length > 30).length || 1;
+        const newDoc: RecruitmentDocument = {
+          id: 'static-doc-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+          filename,
+          title: filename.replace(/\.[^/.]+$/, "").replace(/_/g, " "),
+          content: extractedText,
+          fileType: ext as any,
+          category: cat as any,
+          uploadDate: new Date().toISOString().split('T')[0],
+          version: '1.0',
+          isLatest: true,
+          isActive: true,
+          chunksCount,
+          dataPath: path.join('uploads', cat, filename),
+          ragPath: filePath.replace(process.cwd() + path.sep, '')
+        };
+
+        // Unmark other latest in the same category just to keep DB consistent
+        db.documents.forEach(doc => {
+          if (doc.category === cat) {
+            doc.isLatest = false;
+          }
+        });
+
+        db.documents.push(newDoc);
+        updated = true;
+        console.log(`[RAG Syncer] Successfully indexed static legacy document: ${filename}`);
+      } catch (err) {
+        console.error(`[RAG Syncer] Failed to index static legacy document ${filename}:`, err);
+      }
+    }
+  }
+
+  // 2. Advanced structured RAG subdirectory (uploads/RAG/<uploadDate>/[category]__[filename].md) scanner
+  const ragRoot = path.join(process.cwd(), 'uploads', 'RAG');
+  if (fs.existsSync(ragRoot)) {
+    try {
+      const dates = fs.readdirSync(ragRoot);
+      for (const dDir of dates) {
+        const fullDDir = path.join(ragRoot, dDir);
+        if (!fs.statSync(fullDDir).isDirectory()) continue;
+        
+        const files = fs.readdirSync(fullDDir);
+        for (const file of files) {
+          if (!file.endsWith('.md')) continue;
+          
+          let category: 'ug' | 'pg' | 'general' = 'general';
+          let originalName = file;
+          
+          if (file.includes('__')) {
+            const parts = file.split('__');
+            const catPart = parts[0];
+            if (['ug', 'pg', 'general'].includes(catPart)) {
+              category = catPart as any;
+              originalName = parts.slice(1).join('__');
+            }
+          }
+          
+          // Check if already indexed in db.documents by checking filename or ragPath
+          const relativeRagPath = path.join('uploads', 'RAG', dDir, file);
+          const alreadyIndexed = db.documents.some(doc => 
+            (doc.ragPath === relativeRagPath) || 
+            (doc.filename === originalName && doc.category === category)
+          );
+          
+          if (alreadyIndexed) continue;
+          
+          console.log(`[RAG Syncer] Found new auto-structured document in RAG folder: ${file} (Date: ${dDir}, Category: ${category}). Indexing...`);
+          const fileContent = fs.readFileSync(path.join(fullDDir, file), 'utf-8');
+          const chunksCount = fileContent.split(/\n\s*\n/).filter((p: string) => p.trim().length > 30).length || 1;
+          
+          const newDoc: RecruitmentDocument = {
+            id: 'static-rag-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+            filename: originalName,
+            title: originalName.replace(/\.[^/.]+$/, "").replace(/_/g, " "),
+            content: fileContent,
+            fileType: 'md' as any,
+            category: category,
+            uploadDate: dDir,
+            version: '1.0',
+            isLatest: true,
+            isActive: true,
+            chunksCount,
+            dataPath: path.join('uploads', 'Data', dDir, originalName),
+            ragPath: relativeRagPath
+          };
+          
+          db.documents.forEach(doc => {
+            if (doc.category === category) {
+              doc.isLatest = false;
+            }
+          });
+          
+          db.documents.push(newDoc);
+          updated = true;
+          console.log(`[RAG Syncer] Successfully indexed static structured RAG file: ${file}`);
+        }
+      }
+    } catch (err) {
+      console.error('[RAG Syncer] Error during structured RAG sync scan:', err);
+    }
+  }
+
+  if (updated) {
+    writeDB(db);
+    console.log('[RAG Syncer] db.json updated with newly discovered static documents.');
+  } else {
+    console.log('[RAG Syncer] Static RAG documents synchronized. No new documents found.');
+  }
+}
+
 // Setup Vite or build static file serving
 const startExpress = async () => {
+  // Sync static documents on startup
+  await syncStaticRAGDocuments();
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -1961,3 +2538,5 @@ const startExpress = async () => {
 };
 
 startExpress();
+
+export default app;

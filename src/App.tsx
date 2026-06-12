@@ -286,7 +286,7 @@ export default function App() {
             <p className="text-slate-400 mt-0.5 font-medium font-sans">{schoolConfig?.address ? `Địa chỉ: ${schoolConfig.address}` : "Trụ sở chính: Số 68 Nguyễn Chí Thanh, Phường Láng, Hà Nội"}</p>
           </div>
           <p className="text-[11px] text-slate-400 font-medium">
-            AI-Engine powered by Gemini • © 2026 Bản quyền thuộc về {schoolConfig?.name || "Học viện Phụ nữ Việt Nam"}.
+            © 2026 Bản quyền thuộc về {schoolConfig?.name || "Học viện Phụ nữ Việt Nam"}.
           </p>
         </div>
       </footer>

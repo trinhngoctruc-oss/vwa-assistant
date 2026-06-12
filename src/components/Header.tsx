@@ -52,15 +52,15 @@ export default function Header({
             )}
             <div>
               <div className="flex items-center space-x-2">
-                <span className="font-display font-bold text-sm sm:text-base leading-tight uppercase tracking-tight text-blue-900">
+                <span className="font-display font-bold text-sm sm:text-base leading-tight uppercase tracking-tight text-blue-900 hidden sm:inline-block">
                   {schoolConfig?.name || "Học viện Phụ nữ Việt Nam"}
                 </span>
                 <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded uppercase tracking-wider border border-blue-200">
                   {schoolConfig?.shortName || "VWA"}
                 </span>
               </div>
-              <p className="text-[10px] text-blue-600 uppercase tracking-widest font-sans hidden sm:block font-semibold">
-                {schoolConfig?.name || "Vietnam Women's Academy"} • Admissions AI Panel
+              <p className="text-[10px] text-blue-600 uppercase tracking-widest font-sans hidden sm:block font-semibold font-display">
+                HỆ THỐNG TRỢ LÝ AI TUYỂN SINH
               </p>
             </div>
           </div>
@@ -123,12 +123,6 @@ export default function Header({
                 </button>
               </div>
             )}
-
-            {/* Online indicator */}
-            <div className="flex items-center space-x-1.5 bg-slate-50 py-1.5 px-2.5 rounded-xl border border-slate-200 text-[11px] font-mono">
-              <span className={`h-2 w-2 rounded-full ${onlineStatus === 'online' ? 'bg-emerald-500' : 'bg-rose-500'} animate-pulse`}></span>
-              <span className="text-slate-600 hidden sm:inline capitalize font-medium">{onlineStatus}</span>
-            </div>
           </div>
         </div>
       </div>
