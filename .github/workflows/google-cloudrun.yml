@@ -1,0 +1,59 @@
+name: Deploy to Google Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: YOUR_GCP_PROJECT_ID      # TODO: Thay thế bằng ID dự án Google Cloud của bạn
+  SERVICE_NAME: ai-hpn                 # Tên dịch vụ Cloud Run
+  REGION: asia-southeast1              # Vùng máy chủ đặt tại Đông Nam Á (gần Việt Nam)
+
+jobs:
+  deploy:
+    name: Build and Deploy to Cloud Run
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Đăng nhập vào Google Cloud thông qua Service Account Key
+      # (Mẹo khuyên dùng: Sử dụng Workload Identity Federation nếu muốn bảo mật tối ưu)
+      - name: Authenticate with Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }} # Lưu JSON Key của Service Account vào GitHub Secret với tên GCP_SA_KEY
+
+      # Thiết lập gcloud SDK
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # Cấu hình xác thực cho Docker đăng nhập vào Artifact Registry hoặc gcr.io
+      - name: Authorize Docker Push
+        run: |
+          gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
+
+      # Hoặc đơn giản là sử dụng Google Cloud Build để xây dựng Container từ xa (mạnh mẽ và nhanh chóng)
+      - name: Build and Push Container using Cloud Build
+        run: |
+          gcloud builds submit \
+            --tag asia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}/app:${{ github.sha }} \
+            .
+
+      # Triển khai Image lên Google Cloud Run
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: asia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}/app:${{ github.sha }}
+          # Truyền các biến môi trường cấu hình tại runtime
+          env_vars: |
+            NODE_ENV=production
+            PORT=3000
+          # Chỉ cấu hình bí mật (secrets) như GEMINI_API_KEY bằng Google Secret Manager để đảm bảo bảo mật tối ưu
+          # secrets: |
+          #   GEMINI_API_KEY=GEMINI_API_KEY:latest

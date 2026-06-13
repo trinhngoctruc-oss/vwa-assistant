@@ -11,10 +11,12 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import multer from 'multer';
 import mammoth from 'mammoth';
+import { initializeApp as initFirebaseApp } from 'firebase/app';
+import { getStorage as getFirebaseStorage, ref as firebaseStorageRef, uploadBytes as uploadFirebaseBytes, getDownloadURL as getFirebaseDownloadURL, deleteObject as deleteFirebaseObject } from 'firebase/storage';
 import { RecruitmentDocument, FAQ, HistoryItem, RecruitmentStats, SchoolConfig } from './src/types.ts';
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Setup database files
 const DB_FILE = path.join(process.cwd(), 'db.json');
@@ -28,6 +30,67 @@ if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(IMAGE_DIR)) fs.mkdirSync(IMAGE_DIR, { recursive: true });
 if (!fs.existsSync(RAG_DIR)) fs.mkdirSync(RAG_DIR, { recursive: true });
+
+// Load Firebase Config & Initialize Storage
+let firebaseStorage: any = null;
+try {
+  const firebaseConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
+  if (fs.existsSync(firebaseConfigPath)) {
+    const firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, 'utf-8'));
+    const firebaseApp = initFirebaseApp(firebaseConfig);
+    firebaseStorage = getFirebaseStorage(firebaseApp);
+    console.log('[Firebase Storage] Initialized successfully with bucket:', firebaseConfig.storageBucket);
+  } else {
+    console.warn('[Firebase Storage] firebase-applet-config.json not found. Firebase Storage is disabled.');
+  }
+} catch (err) {
+  console.error('[Firebase Storage] Initialization failed:', err);
+}
+
+/**
+ * Uploads a buffer to Firebase Storage and returns its public download URL.
+ */
+async function uploadToFirebaseStorage(
+  buffer: Buffer,
+  relativePath: string,
+  mimeType: string
+): Promise<string> {
+  if (firebaseStorage) {
+    try {
+      console.log(`[Firebase Storage] Uploading ${relativePath}...`);
+      // Standardize path separator to slash for Firebase Storage
+      const normalizedPath = relativePath.replace(/\\/g, '/');
+      const storageRef = firebaseStorageRef(firebaseStorage, normalizedPath);
+      const metadata = { contentType: mimeType };
+      await uploadFirebaseBytes(storageRef, buffer, metadata);
+      const downloadUrl = await getFirebaseDownloadURL(storageRef);
+      console.log(`[Firebase Storage] Uploaded successfully. URL: ${downloadUrl}`);
+      return downloadUrl;
+    } catch (err) {
+      console.error(`[Firebase Storage] Upload error for ${relativePath}:`, err);
+      throw err;
+    }
+  } else {
+    console.warn(`[Firebase Storage] Not initialized. Cannot upload ${relativePath}.`);
+    throw new Error('Firebase Storage is not initialized');
+  }
+}
+
+/**
+ * Deletes an object from Firebase Storage by its HTTP/HTTPS download URL.
+ */
+async function deleteFromFirebaseStorageByUrl(url: string): Promise<void> {
+  if (firebaseStorage && url && (url.startsWith('https://firebasestorage.googleapis.com') || url.startsWith('gs://'))) {
+    try {
+      console.log(`[Firebase Storage] Deleting by URL: ${url}`);
+      const storageRef = firebaseStorageRef(firebaseStorage, url);
+      await deleteFirebaseObject(storageRef);
+      console.log(`[Firebase Storage] Deleted successfully: ${url}`);
+    } catch (err) {
+      console.warn(`[Firebase Storage] Failed to delete file by URL ${url}:`, err);
+    }
+  }
+}
 
 // Multer storage
 const upload = multer({
@@ -389,7 +452,7 @@ function searchDocsContext(query: string, category: 'ug' | 'pg' | 'general' | 'a
   for (const doc of activeDocs) {
     // Read live content directly from physical files under uploads/RAG/ matching user rules 3 & 4
     let docContent = doc.content;
-    if (doc.ragPath) {
+    if (doc.ragPath && !doc.ragPath.startsWith('http') && !doc.ragPath.startsWith('https')) {
       const fullPath = path.isAbsolute(doc.ragPath) ? doc.ragPath : path.join(process.cwd(), doc.ragPath);
       if (fs.existsSync(fullPath)) {
         try {
@@ -574,9 +637,31 @@ app.get('/api/documents', (req, res) => {
 });
 
 // Delete document
-app.delete('/api/documents/:id', (req, res) => {
+app.delete('/api/documents/:id', async (req, res) => {
   const { id } = req.params;
   const db = readDB();
+  const docToDelete = db.documents.find(doc => doc.id === id);
+  if (docToDelete) {
+    if (docToDelete.dataPath) {
+      await deleteFromFirebaseStorageByUrl(docToDelete.dataPath);
+    }
+    if (docToDelete.ragPath) {
+      await deleteFromFirebaseStorageByUrl(docToDelete.ragPath);
+    }
+    // Also delete physical local files if present
+    try {
+      const localDataFullPath = path.isAbsolute(docToDelete.dataPath || '') ? docToDelete.dataPath : path.join(process.cwd(), docToDelete.dataPath || '');
+      if (localDataFullPath && fs.existsSync(localDataFullPath)) {
+        fs.unlinkSync(localDataFullPath);
+      }
+      const localRagFullPath = path.isAbsolute(docToDelete.ragPath || '') ? docToDelete.ragPath : path.join(process.cwd(), docToDelete.ragPath || '');
+      if (localRagFullPath && fs.existsSync(localRagFullPath)) {
+        fs.unlinkSync(localRagFullPath);
+      }
+    } catch (e) {
+      console.warn('Could not delete local file copies:', e);
+    }
+  }
   db.documents = db.documents.filter(doc => doc.id !== id);
   writeDB(db);
   res.json({ success: true, message: 'Đã xóa tài liệu khỏi hệ thống.' });
@@ -816,6 +901,25 @@ Hãy bảo đảm giữ nguyên các con số chính xác 100% (học phí, ch�
     fs.writeFileSync(paths.ragPath, extractedText, 'utf-8');
     console.log(`[Upload] Processed RAG text saved to ${paths.ragPath}`);
 
+    // Upload files to Firebase Storage if initialized
+    let uploadDataUrl = paths.relativeDataPath;
+    let uploadRagUrl = paths.relativeRagPath;
+
+    if (firebaseStorage) {
+      try {
+        console.log('[Firebase Storage] Uploading original file and RAG text...');
+        // 1. Upload original file
+        uploadDataUrl = await uploadToFirebaseStorage(req.file.buffer, paths.relativeDataPath, mimeType);
+        
+        // 2. Upload RAG parsed markdown text file
+        const ragBuffer = Buffer.from(extractedText, 'utf-8');
+        uploadRagUrl = await uploadToFirebaseStorage(ragBuffer, paths.relativeRagPath, 'text/markdown');
+        console.log('[Firebase Storage] Upload completed successfully. Data URL:', uploadDataUrl, 'Rag URL:', uploadRagUrl);
+      } catch (storageErr) {
+        console.error('[Firebase Storage] Upload error, fell back to local file paths:', storageErr);
+      }
+    }
+
     // Split paragraphs count
     const chunksCount = extractedText.split(/\n\s*\n/).filter(p => p.trim().length > 30).length || 1;
 
@@ -831,8 +935,8 @@ Hãy bảo đảm giữ nguyên các con số chính xác 100% (học phí, ch�
       isLatest: true,
       isActive: true,
       chunksCount,
-      dataPath: paths.relativeDataPath,
-      ragPath: paths.relativeRagPath
+      dataPath: uploadDataUrl,
+      ragPath: uploadRagUrl
     };
 
     const db = readDB();
